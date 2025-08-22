@@ -1,11 +1,7 @@
 {
-  "version": 2,
   "functions": {
-    "api/webhook.js": {
-      "runtime": "nodejs18.x"
-    },
-    "api/setup-db.js": {
-      "runtime": "nodejs18.x"
+    "api/*.js": {
+      "runtime": "@vercel/node@3"
     }
   },
   "rewrites": [
