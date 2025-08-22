@@ -1,0 +1,6 @@
+.env.local
+.env
+fastcab.db
+node_modules/
+.vercel
+.DS_Store

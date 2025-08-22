@@ -1,0 +1,21 @@
+{
+  "name": "fast-cab-bot",
+  "version": "1.0.0",
+  "description": "Fast Cab WhatsApp Bot Backend",
+  "main": "index.js",
+  "scripts": {
+    "build": "node api/setup-db.js",
+    "dev": "node server.js",
+    "start": "node server.js",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "sqlite3": "^5.1.6",
+    "twilio": "^4.20.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}

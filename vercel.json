@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "functions": {
+    "api/webhook.js": {
+      "runtime": "nodejs18.x"
+    },
+    "api/setup-db.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ]
+}
