@@ -1,383 +1,269 @@
+// Fast Cab WhatsApp Webhook Handler - Fixed for Vercel
 const twilio = require('twilio');
-const { getConversation, updateConversation, saveUser, getRide, saveRide } = require('./database');
 
-// Twilio credentials from environment
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+// Initialize Twilio client
+const client = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
-const client = twilio(accountSid, authToken);
+// Import database functions
+const { 
+  getUser, 
+  createUser, 
+  updateUser, 
+  getConversation, 
+  updateConversation, 
+  createRide, 
+  updateRide, 
+  getDrivers 
+} = require('./database');
 
-// Mock drivers for testing
-const mockDrivers = [
-  {
-    id: 1,
-    name: 'Kemi A.',
-    phone: '08011234567',
-    vehicle: 'Blue Toyota Corolla',
-    plate: 'ABC-123-XY',
-    rating: 4.8,
-    arrival_time: 4,
-    fare: { economy: 1200, comfort: 1800, premium: 2500 }
-  },
-  {
-    id: 2,
-    name: 'Ahmed S.',
-    phone: '08023456789',
-    vehicle: 'Black Honda Accord',
-    plate: 'DEF-456-ZY',
-    rating: 4.9,
-    arrival_time: 3,
-    fare: { economy: 1200, comfort: 1800, premium: 2500 }
-  },
-  {
-    id: 3,
-    name: 'David O.',
-    phone: '08034567890',
-    vehicle: 'White Mercedes C-Class',
-    plate: 'GHI-789-WX',
-    rating: 5.0,
-    arrival_time: 2,
-    fare: { economy: 1200, comfort: 1800, premium: 2500 }
+// Helper function to parse URL-encoded body
+function parseBody(body) {
+  const params = new URLSearchParams(body);
+  const result = {};
+  for (const [key, value] of params) {
+    result[key] = value;
   }
-];
+  return result;
+}
 
-// Send WhatsApp message
-const sendMessage = async (to, message) => {
+// Helper function to send WhatsApp message
+async function sendMessage(to, message) {
   try {
     await client.messages.create({
-      from: twilioPhoneNumber,
-      to: to,
-      body: message
+      body: message,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: to
     });
-    console.log(`✅ Message sent to ${to}: ${message.substring(0, 50)}...`);
+    console.log(`✅ Message sent to ${to}`);
   } catch (error) {
-    console.error('❌ Error sending message:', error.message);
+    console.error(`❌ Error sending message:`, error);
   }
-};
-
-// Bot conversation states and responses
-const botResponses = {
-  welcome: (userData) => {
-    return `🚖 *Welcome to Fast Cab!*
-
-Book rides instantly via WhatsApp - no app needed!
-
-*What can I help you with?*
-
-1️⃣ 🚗 Book a Ride
-2️⃣ 📍 Track Current Ride  
-3️⃣ 📞 Support
-
-*Reply with 1, 2, or 3*`;
-  },
-
-  request_pickup: () => {
-    return `🎯 *Let's get you moving!*
-
-📍 *Where should I pick you up?*
-
-- Share your live location 📍
-- OR type your area (e.g. "Victoria Island", "Ikeja", "Lekki")`;
-  },
-
-  request_destination: (pickup) => {
-    return `✅ Pickup: *${pickup}*
-
-🏁 *Where are you going?*
-
-- Share destination location 📍  
-- OR type destination area`;
-  },
-
-  show_drivers: (pickup, destination) => {
-    return `🔍 *Finding drivers...*
-
-✅ *3 drivers found!*
-
-🚗 *ECONOMY* - ₦1,200
-👨‍🚗 Kemi A. • 4.8⭐ • 4 mins away
-
-🚙 *COMFORT* - ₦1,800  
-👨‍🚗 Ahmed S. • 4.9⭐ • 3 mins away
-
-🏪 *PREMIUM* - ₦2,500
-👨‍🚗 David O. • 5.0⭐ • 2 mins away
-
-*Choose: 1, 2, or 3*`;
-  },
-
-  confirm_booking: (driverType, pickup, destination) => {
-    const driver = mockDrivers[parseInt(driverType) - 1];
-    const fare = driver.fare[driverType === '1' ? 'economy' : driverType === '2' ? 'comfort' : 'premium'];
-    
-    return `✅ *Booking confirmed!*
-
-👨‍🚗 *Driver: ${driver.name}*
-🚗 ${driver.vehicle} • ${driver.plate}
-⭐ ${driver.rating}/5 rating
-💰 Fare: ₦${fare.toLocaleString()}
-
-📞 *Driver: ${driver.phone}*
-📍 *From:* ${pickup}
-📍 *To:* ${destination}
-
-⏰ *Arriving in ${driver.arrival_time} minutes*
-
-💡 *I'll update you when driver arrives and trip starts!*`;
-  },
-
-  driver_arrived: (driverData) => {
-    return `🎉 *Driver Arrived!*
-
-👨‍🚗 *${driverData.name} is here*
-🚗 ${driverData.vehicle} (${driverData.plate})
-📱 Call: ${driverData.phone}
-
-*Please head to your driver now*`;
-  },
-
-  trip_started: (destination) => {
-    return `🛣️ *Trip Started!*
-
-📍 En route to: *${destination}*
-⏱️ ETA: *18 minutes*
-
-🛡️ *Trip is being tracked for your safety*
-
-*Sit back and relax!* ✨`;
-  },
-
-  trip_completed: (pickup, destination, fare) => {
-    return `🎉 *Trip Completed!*
-
-📍 *Arrived at ${destination}*
-⏱️ *Journey: 16 minutes*
-💰 *Fare: ₦${fare.toLocaleString()}*
-
-💳 *How would you like to pay?*
-
-1️⃣ 💵 Cash
-2️⃣ 💳 Card  
-3️⃣ 🏦 Transfer
-4️⃣ 📱 Mobile Money
-
-*Choose: 1, 2, 3, or 4*`;
-  },
-
-  rating_request: (paymentMethod) => {
-    return `✅ *Payment: ${paymentMethod} Selected*
-
-⭐ *Quick rating:*
-
-*Tap your rating:*
-1️⃣⭐ 2️⃣⭐⭐ 3️⃣⭐⭐⭐ 4️⃣⭐⭐⭐⭐ 5️⃣⭐⭐⭐⭐⭐`;
-  },
-
-  trip_summary: (rating, pickup, destination, fare, driverName) => {
-    return `⭐ *Thanks for the ${rating}-star rating!*
-
-🎉 *Trip Summary*
-📍 ${pickup} → ${destination}  
-⏱️ 16 mins • ₦${fare.toLocaleString()}
-👨‍🚗 ${driverName} • ${rating}⭐
-
-*Need another ride?*
-Reply *"1"* anytime! 🚖
-
-*Thanks for choosing Fast Cab!* 💚`;
-  },
-
-  support: () => {
-    return `📞 *Fast Cab Support*
-
-*Common issues:*
-1️⃣ Cancel current ride
-2️⃣ Driver not found
-3️⃣ Payment issue  
-4️⃣ Lost item
-5️⃣ Emergency
-
-📱 *Urgent?* Call: ${process.env.SUPPORT_PHONE || '0701-XXX-XXXX'}
-📧 Email: help@fastcab.ng
-
-*What do you need help with?*`;
-  },
-
-  invalid_option: () => {
-    return `🤔 I didn't understand that.
-
-Please choose from the available options or type:
-• *"1"* to book a ride
-• *"help"* for support
-• *"hi"* to start over`;
-  }
-};
-
-// Process incoming messages
-const processMessage = async (phoneNumber, messageBody, userData) => {
-  const conversation = await getConversation(phoneNumber);
-  const state = conversation ? conversation.state : 'welcome';
-  const data = conversation ? JSON.parse(conversation.data) : {};
-
-  console.log(`📱 Processing message from ${phoneNumber}: "${messageBody}" (state: ${state})`);
-
-  let response = '';
-  let newState = state;
-  let newData = { ...data };
-
-  // Handle different conversation states
-  switch (state) {
-    case 'welcome':
-      if (messageBody === '1' || messageBody.toLowerCase().includes('book')) {
-        response = botResponses.request_pickup();
-        newState = 'awaiting_pickup';
-      } else if (messageBody === '2' || messageBody.toLowerCase().includes('track')) {
-        response = botResponses.support(); // For now, redirect to support
-      } else if (messageBody === '3' || messageBody.toLowerCase().includes('support') || messageBody.toLowerCase().includes('help')) {
-        response = botResponses.support();
-        newState = 'support';
-      } else {
-        response = botResponses.welcome();
-      }
-      break;
-
-    case 'awaiting_pickup':
-      newData.pickup = messageBody;
-      response = botResponses.request_destination(messageBody);
-      newState = 'awaiting_destination';
-      break;
-
-    case 'awaiting_destination':
-      newData.destination = messageBody;
-      response = botResponses.show_drivers(newData.pickup, messageBody);
-      newState = 'choosing_ride';
-      break;
-
-    case 'choosing_ride':
-      if (['1', '2', '3'].includes(messageBody)) {
-        const driver = mockDrivers[parseInt(messageBody) - 1];
-        const rideType = messageBody === '1' ? 'economy' : messageBody === '2' ? 'comfort' : 'premium';
-        const fare = driver.fare[rideType];
-        
-        newData.driver = driver;
-        newData.rideType = rideType;
-        newData.fare = fare;
-        
-        // Save ride to database
-        await saveRide({
-          phone_number: phoneNumber,
-          pickup_location: newData.pickup,
-          destination: newData.destination,
-          ride_type: rideType,
-          driver_name: driver.name,
-          driver_phone: driver.phone,
-          fare: fare,
-          status: 'confirmed'
-        });
-
-        response = botResponses.confirm_booking(messageBody, newData.pickup, newData.destination);
-        newState = 'ride_confirmed';
-
-        // Simulate driver arrival after 30 seconds
-        setTimeout(async () => {
-          await sendMessage(phoneNumber, botResponses.driver_arrived(driver));
-          await updateConversation(phoneNumber, 'driver_arrived', JSON.stringify(newData));
-          
-          // Simulate trip start after another 30 seconds
-          setTimeout(async () => {
-            await sendMessage(phoneNumber, botResponses.trip_started(newData.destination));
-            await updateConversation(phoneNumber, 'trip_in_progress', JSON.stringify(newData));
-            
-            // Simulate trip completion after 2 minutes
-            setTimeout(async () => {
-              await sendMessage(phoneNumber, botResponses.trip_completed(newData.pickup, newData.destination, fare));
-              await updateConversation(phoneNumber, 'awaiting_payment', JSON.stringify(newData));
-            }, 120000); // 2 minutes
-          }, 30000); // 30 seconds
-        }, 30000); // 30 seconds
-
-      } else {
-        response = botResponses.invalid_option();
-      }
-      break;
-
-    case 'awaiting_payment':
-      if (['1', '2', '3', '4'].includes(messageBody)) {
-        const paymentMethods = ['Cash', 'Card', 'Transfer', 'Mobile Money'];
-        const paymentMethod = paymentMethods[parseInt(messageBody) - 1];
-        
-        newData.paymentMethod = paymentMethod;
-        response = botResponses.rating_request(paymentMethod);
-        newState = 'awaiting_rating';
-      } else {
-        response = botResponses.invalid_option();
-      }
-      break;
-
-    case 'awaiting_rating':
-      if (['1', '2', '3', '4', '5'].includes(messageBody)) {
-        const rating = messageBody;
-        response = botResponses.trip_summary(rating, newData.pickup, newData.destination, newData.fare, newData.driver.name);
-        newState = 'welcome';
-        newData = {}; // Reset conversation data
-      } else {
-        response = botResponses.invalid_option();
-      }
-      break;
-
-    case 'support':
-      // Handle support queries
-      response = `Thanks for your message. A support agent will get back to you shortly.
-
-Meanwhile, you can:
-• Reply *"1"* to book a new ride
-• Call ${process.env.SUPPORT_PHONE || '0701-XXX-XXXX'} for urgent issues`;
-      newState = 'welcome';
-      break;
-
-    default:
-      response = botResponses.welcome();
-      newState = 'welcome';
-      newData = {};
-  }
-
-  // Update conversation state
-  await updateConversation(phoneNumber, newState, JSON.stringify(newData));
-  
-  return response;
-};
+}
 
 // Main webhook handler
-const handleWebhook = async (req, res) => {
+module.exports = async (req, res) => {
   try {
-    console.log('📨 Received webhook:', req.body);
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    const { From, To, Body } = req.body;
-    
-    if (!From || !Body) {
-      console.log('❌ Missing From or Body in webhook');
-      return res.status(400).send('Bad Request');
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
     }
 
-    // Clean phone number
-    const phoneNumber = From.replace('whatsapp:', '');
-    const messageBody = Body.trim();
+    // Handle GET requests (for testing)
+    if (req.method === 'GET') {
+      return res.status(200).json({
+        message: 'Fast Cab WhatsApp Webhook is working!',
+        timestamp: new Date().toISOString(),
+        environment: {
+          nodeVersion: process.version,
+          hasTwilioSid: !!process.env.TWILIO_ACCOUNT_SID,
+          hasTwilioToken: !!process.env.TWILIO_AUTH_TOKEN,
+          hasTwilioPhone: !!process.env.TWILIO_PHONE_NUMBER
+        }
+      });
+    }
 
-    // Save/update user
-    await saveUser(phoneNumber);
+    // Handle POST requests (WhatsApp messages)
+    if (req.method === 'POST') {
+      console.log('📨 Received webhook request');
+      
+      // Parse the request body
+      let body;
+      if (typeof req.body === 'string') {
+        body = parseBody(req.body);
+      } else if (req.body && typeof req.body === 'object') {
+        body = req.body;
+      } else {
+        // If body is still undefined, it might be raw data
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => {
+          const rawBody = Buffer.concat(chunks).toString();
+          body = parseBody(rawBody);
+          return handleWhatsAppMessage(body, res);
+        });
+        return;
+      }
 
-    // Process the message and get response
-    const response = await processMessage(phoneNumber, messageBody, {});
+      return await handleWhatsAppMessage(body, res);
+    }
 
-    // Send response
-    await sendMessage(From, response);
+    return res.status(405).json({ error: 'Method not allowed' });
 
-    res.status(200).send('OK');
   } catch (error) {
     console.error('❌ Webhook error:', error);
-    res.status(500).send('Internal Server Error');
+    return res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
   }
 };
 
-module.exports = handleWebhook;
+async function handleWhatsAppMessage(body, res) {
+  try {
+    const { Body: message, From: from, To: to } = body;
+    
+    console.log(`📱 Message from ${from}: "${message}"`);
+
+    if (!message || !from) {
+      console.log('❌ Missing message or sender info');
+      return res.status(400).json({ error: 'Missing message or sender info' });
+    }
+
+    // Clean phone number (remove whatsapp: prefix)
+    const phoneNumber = from.replace('whatsapp:', '');
+    
+    // Get or create user
+    let user = await getUser(phoneNumber);
+    if (!user) {
+      user = await createUser(phoneNumber);
+      console.log(`👤 New user created: ${phoneNumber}`);
+    }
+
+    // Get conversation state
+    let conversation = await getConversation(user.id);
+    
+    const userMessage = message.trim().toLowerCase();
+    
+    // Handle conversation flow
+    if (!conversation || conversation.state === 'completed') {
+      // Start new conversation
+      if (userMessage.includes('hi') || userMessage.includes('hello') || userMessage.includes('start')) {
+        await updateConversation(user.id, 'menu', {});
+        await sendMessage(from, 
+          `🚖 Welcome to Fast Cab!\n\n` +
+          `1️⃣ Book a Ride\n` +
+          `2️⃣ Check Ride Status\n` +
+          `3️⃣ Support\n\n` +
+          `Reply with a number to continue.`
+        );
+      } else {
+        await sendMessage(from, 
+          `👋 Hi! Welcome to Fast Cab.\n\n` +
+          `Send "hi" to get started with booking your ride!`
+        );
+      }
+    }
+    else if (conversation.state === 'menu') {
+      if (userMessage === '1') {
+        await updateConversation(user.id, 'pickup_location', {});
+        await sendMessage(from, 
+          `📍 Great! Let's book your ride.\n\n` +
+          `Please share your pickup location:`
+        );
+      } else if (userMessage === '2') {
+        await sendMessage(from, 
+          `🚗 You don't have any active rides.\n\n` +
+          `Send "1" to book a new ride!`
+        );
+      } else if (userMessage === '3') {
+        await sendMessage(from, 
+          `📞 Fast Cab Support\n\n` +
+          `📧 Email: support@fastcab.ng\n` +
+          `📱 Phone: +234 901 234 5678\n\n` +
+          `Send "1" to book a ride.`
+        );
+      } else {
+        await sendMessage(from, 
+          `❌ Invalid option. Please choose:\n\n` +
+          `1️⃣ Book a Ride\n` +
+          `2️⃣ Check Ride Status\n` +
+          `3️⃣ Support`
+        );
+      }
+    }
+    else if (conversation.state === 'pickup_location') {
+      // Save pickup location and ask for destination
+      await updateConversation(user.id, 'destination_location', { 
+        pickup_location: message 
+      });
+      await sendMessage(from, 
+        `✅ Pickup: ${message}\n\n` +
+        `📍 Now, what's your destination?`
+      );
+    }
+    else if (conversation.state === 'destination_location') {
+      // Save destination and show drivers
+      const conversationData = conversation.data || {};
+      conversationData.destination_location = message;
+      
+      await updateConversation(user.id, 'selecting_driver', conversationData);
+      
+      const drivers = await getDrivers();
+      let driverMessage = `🚗 Available drivers:\n\n`;
+      
+      drivers.forEach((driver, index) => {
+        driverMessage += `${index + 1}️⃣ ${driver.name}\n`;
+        driverMessage += `⭐ ${driver.rating}/5 (${driver.trips} trips)\n`;
+        driverMessage += `💰 ₦${driver.price_per_km}/km\n`;
+        driverMessage += `🕐 ${driver.eta} mins away\n\n`;
+      });
+      
+      driverMessage += `Reply with driver number (1-5)`;
+      
+      await sendMessage(from, driverMessage);
+    }
+    else if (conversation.state === 'selecting_driver') {
+      const driverIndex = parseInt(userMessage) - 1;
+      const drivers = await getDrivers();
+      
+      if (driverIndex >= 0 && driverIndex < drivers.length) {
+        const selectedDriver = drivers[driverIndex];
+        const conversationData = conversation.data;
+        
+        // Create ride
+        const ride = await createRide(
+          user.id,
+          conversationData.pickup_location,
+          conversationData.destination_location,
+          selectedDriver.id
+        );
+        
+        await updateConversation(user.id, 'ride_booked', { ride_id: ride.id });
+        
+        await sendMessage(from,
+          `🎉 Ride booked successfully!\n\n` +
+          `👤 Driver: ${selectedDriver.name}\n` +
+          `📍 From: ${conversationData.pickup_location}\n` +
+          `📍 To: ${conversationData.destination_location}\n` +
+          `🕐 ETA: ${selectedDriver.eta} minutes\n` +
+          `📱 Driver will call you shortly.\n\n` +
+          `Ride ID: #${ride.id}\n\n` +
+          `Thank you for choosing Fast Cab! 🚖`
+        );
+        
+        // Mark conversation as completed
+        await updateConversation(user.id, 'completed', {});
+      } else {
+        await sendMessage(from, 
+          `❌ Invalid driver selection. Please choose 1-5.`
+        );
+      }
+    }
+    else {
+      // Handle unexpected state
+      await updateConversation(user.id, 'menu', {});
+      await sendMessage(from, 
+        `🚖 Welcome back to Fast Cab!\n\n` +
+        `1️⃣ Book a Ride\n` +
+        `2️⃣ Check Ride Status\n` +
+        `3️⃣ Support\n\n` +
+        `Reply with a number to continue.`
+      );
+    }
+
+    console.log('✅ Message processed successfully');
+    return res.status(200).json({ success: true });
+
+  } catch (error) {
+    console.error('❌ Error processing message:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
