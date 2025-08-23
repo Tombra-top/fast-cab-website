@@ -3,517 +3,304 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fast Cab - Book Your Ride on WhatsApp</title>
+    <title>Fast Cab - Lagos Ride Hailing Demo</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            color: #1a1a1a;
-            overflow-x: hidden;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
-
+        
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
-            padding: 0 20px;
-        }
-
-        /* Header */
-        header {
-            background: linear-gradient(135deg, #00C851 0%, #007E33 100%);
-            padding: 1rem 0;
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 2px 20px rgba(0, 200, 81, 0.3);
-        }
-
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 2rem;
-            font-weight: 800;
-            color: white;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            list-style: none;
-            gap: 2rem;
-        }
-
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            font-weight: 500;
-            transition: opacity 0.3s ease;
-        }
-
-        .nav-links a:hover {
-            opacity: 0.8;
-        }
-
-        /* Hero Section */
-        .hero {
-            background: linear-gradient(135deg, #00C851 0%, #007E33 100%);
-            padding: 120px 0 80px;
+            padding: 2rem;
             text-align: center;
-            color: white;
-            position: relative;
-            overflow: hidden;
         }
-
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grid)"/></svg>');
-            opacity: 0.3;
-        }
-
-        .hero-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .hero h1 {
-            font-size: 4rem;
-            font-weight: 900;
-            margin-bottom: 1rem;
-            line-height: 1.1;
-        }
-
-        .hero .subtitle {
-            font-size: 1.5rem;
+        
+        .hero {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 3rem 2rem;
             margin-bottom: 2rem;
-            opacity: 0.95;
-            font-weight: 300;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
-
-        .hero .description {
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        
+        .tagline {
             font-size: 1.2rem;
-            margin-bottom: 3rem;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-            opacity: 0.9;
+            color: #666;
+            margin-bottom: 2rem;
         }
-
+        
+        .demo-badge {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 2rem;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
         .cta-button {
-            background: white;
-            color: #00C851;
-            padding: 18px 40px;
-            font-size: 1.3rem;
-            font-weight: 700;
+            background: linear-gradient(45deg, #25D366, #128C7E);
+            color: white;
+            padding: 1rem 2rem;
             border: none;
             border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
             cursor: pointer;
             text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
+            display: inline-block;
+            margin: 1rem;
             transition: all 0.3s ease;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
         }
-
+        
         .cta-button:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 15px 30px rgba(37, 211, 102, 0.4);
         }
-
-        .whatsapp-icon {
-            width: 28px;
-            height: 28px;
-            background: #25D366;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-
-        /* Features Section */
+        
         .features {
-            padding: 80px 0;
-            background: #f8f9fa;
-        }
-
-        .features h2 {
-            text-align: center;
-            font-size: 2.8rem;
-            font-weight: 800;
-            margin-bottom: 3rem;
-            color: #1a1a1a;
-        }
-
-        .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 3rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
         }
-
-        .feature-card {
-            background: white;
-            padding: 2.5rem;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            transition: transform 0.3s ease;
+        
+        .feature {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1.5rem;
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
         }
-
-        .feature-card:hover {
-            transform: translateY(-8px);
-        }
-
+        
         .feature-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #00C851, #007E33);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1.5rem;
             font-size: 2rem;
-            color: white;
+            margin-bottom: 0.5rem;
         }
-
-        .feature-card h3 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            color: #1a1a1a;
-        }
-
-        .feature-card p {
-            color: #666;
-            line-height: 1.6;
-        }
-
-        /* How It Works */
-        .how-it-works {
-            padding: 80px 0;
-            background: white;
-        }
-
-        .how-it-works h2 {
-            text-align: center;
-            font-size: 2.8rem;
-            font-weight: 800;
-            margin-bottom: 3rem;
-            color: #1a1a1a;
-        }
-
-        .steps {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin-top: 3rem;
-        }
-
-        .step {
-            text-align: center;
+        
+        .instructions {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
             padding: 2rem;
+            margin: 2rem 0;
+            text-align: left;
         }
-
-        .step-number {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #00C851, #007E33);
+        
+        .step {
+            margin: 1rem 0;
+            padding: 1rem;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .whatsapp-info {
+            background: #25D366;
             color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 1.5rem;
-            font-size: 1.5rem;
-            font-weight: 700;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin: 1rem 0;
         }
-
-        .step h3 {
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #1a1a1a;
+        
+        .social-proof {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
         }
-
-        .step p {
-            color: #666;
-        }
-
-        /* CTA Section */
-        .cta-section {
-            background: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
-            padding: 80px 0;
-            text-align: center;
-            color: white;
-        }
-
-        .cta-section h2 {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: 1rem;
-        }
-
-        .cta-section p {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-        }
-
-        /* Footer */
-        footer {
-            background: #1a1a1a;
-            color: white;
-            padding: 40px 0;
-            text-align: center;
-        }
-
-        .footer-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .footer-section h3 {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #00C851;
-        }
-
-        .footer-section p, .footer-section a {
-            color: #ccc;
-            text-decoration: none;
-            line-height: 1.8;
-        }
-
-        .footer-section a:hover {
-            color: #00C851;
-        }
-
-        .footer-bottom {
-            border-top: 1px solid #333;
-            padding-top: 2rem;
-            color: #888;
-        }
-
-        /* Responsive */
+        
         @media (max-width: 768px) {
-            .nav-links {
-                display: none;
-            }
-
-            .hero h1 {
-                font-size: 2.5rem;
-            }
-
-            .hero .subtitle {
-                font-size: 1.2rem;
-            }
-
-            .hero .description {
-                font-size: 1rem;
-            }
-
-            .features h2, .how-it-works h2 {
-                font-size: 2rem;
-            }
+            .container { padding: 1rem; }
+            .hero { padding: 2rem 1rem; }
+            .logo { font-size: 2rem; }
+            .cta-button { width: 100%; margin: 0.5rem 0; }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <header>
-        <nav class="container">
-            <a href="#" class="logo">Fast Cab</a>
-            <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#how-it-works">How It Works</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </nav>
-    </header>
-
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="container">
-            <div class="hero-content">
-                <h1>Fast Cab</h1>
-                <p class="subtitle">Nigeria's First WhatsApp Ride-Hailing Service</p>
-                <p class="description">Book your ride instantly through WhatsApp. No app downloads, no complicated signups. Just message us and get moving!</p>
-                <a href="#" class="cta-button" onclick="bookRide()">
-                    <div class="whatsapp-icon">📱</div>
-                    Book a Ride Now
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Features Section -->
-    <section class="features" id="features">
-        <div class="container">
-            <h2>Why Choose Fast Cab?</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">📱</div>
-                    <h3>WhatsApp Booking</h3>
-                    <p>No app to download. Book your ride directly through WhatsApp - the app you already use every day.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Instant Matching</h3>
-                    <p>Get matched with nearby drivers in seconds. Real-time location sharing for faster pickups.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">💰</div>
-                    <h3>Affordable Pricing</h3>
-                    <p>Transparent pricing with no hidden fees. Pay with cash, card, or mobile money.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🛡️</div>
-                    <h3>Safe & Reliable</h3>
-                    <p>Verified drivers with real-time tracking. Your safety is our top priority.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🌍</div>
-                    <h3>Built for Nigeria</h3>
-                    <p>Designed specifically for Nigerian roads, traffic patterns, and payment preferences.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⭐</div>
-                    <h3>Rated Drivers</h3>
-                    <p>All drivers are rated by passengers. Quality service guaranteed every ride.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- How It Works -->
-    <section class="how-it-works" id="how-it-works">
-        <div class="container">
-            <h2>How Fast Cab Works</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h3>Message Us</h3>
-                    <p>Click "Book a Ride" to start a WhatsApp chat with Fast Cab</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h3>Share Your Location</h3>
-                    <p>Tell us where you are and where you want to go</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h3>Get Driver Match</h3>
-                    <p>We'll find nearby drivers and show you pricing options</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">4</div>
-                    <h3>Confirm & Track</h3>
-                    <p>Confirm your ride and track your driver in real-time</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">5</div>
-                    <h3>Pay & Rate</h3>
-                    <p>Pay through your preferred method and rate your experience</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
-        <div class="container">
-            <h2>Ready to Try Fast Cab?</h2>
-            <p>Join thousands of Nigerians who book their rides through WhatsApp</p>
-            <a href="#" class="cta-button" onclick="bookRide()">
-                <div class="whatsapp-icon">📱</div>
-                Book Your First Ride
-            </a>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer id="contact">
-        <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <h3>Fast Cab</h3>
-                    <p>Nigeria's first WhatsApp-based ride-hailing service. Making transportation simple, fast, and accessible for everyone.</p>
-                </div>
-                <div class="footer-section">
-                    <h3>Contact Us</h3>
-                    <p>WhatsApp: +234 811 426 6998</p>
-                    <p>Email: hello@fastcab.ng</p>
-                    <p>Available 24/7</p>
-                </div>
-                <div class="footer-section">
-                    <h3>Service Areas</h3>
-                    <p>Currently serving Lagos</p>
-                    <p>Expanding to Abuja, Port Harcourt, and Kano soon</p>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2025 Fast Cab. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
-
-    <script>
-        function bookRide() {
-            // Replace with your actual WhatsApp number
-            const phoneNumber = "+2348114266998";
-            const message = encodeURIComponent("Hi! I want to book a ride with Fast Cab.");
-            const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    <div class="container">
+        <div class="hero">
+            <div class="logo">🚖 Fast Cab</div>
+            <div class="demo-badge">🎭 LIVE DEMO</div>
+            <div class="tagline">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</div>
             
-            // Open WhatsApp in a new tab
-            window.open(whatsappUrl, '_blank');
+            <!-- Fixed CTA Button with proper WhatsApp link -->
+            <a href="#" class="cta-button" onclick="startDemo()" id="demo-button">
+                📱 Try Live Demo Now
+            </a>
+            
+            <div class="whatsapp-info">
+                <h3>📱 How to Test:</h3>
+                <p><strong>1.</strong> Click "Try Live Demo Now" above</p>
+                <p><strong>2.</strong> Join WhatsApp sandbox if prompted</p>
+                <p><strong>3.</strong> Say "Hi" to start the demo</p>
+                <p><strong>4.</strong> Try: "ride from Ikoyi to VI"</p>
+            </div>
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3>Instant Booking</h3>
+                <p>One message to book: "ride from A to B"</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🚗</div>
+                <h3>3 Ride Types</h3>
+                <p>Economy, Comfort & Premium options</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">💰</div>
+                <h3>Upfront Pricing</h3>
+                <p>See exact fare before you book</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">👨‍✈️</div>
+                <h3>Driver Profiles</h3>
+                <p>Name, rating, vehicle & phone number</p>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h2>🎯 Demo Instructions</h2>
+            
+            <div class="step">
+                <strong>Step 1:</strong> Click "Try Live Demo Now" to open WhatsApp
+            </div>
+            
+            <div class="step">
+                <strong>Step 2:</strong> If first time, join sandbox with the code shown
+            </div>
+            
+            <div class="step">
+                <strong>Step 3:</strong> Send "Hi" to start the demo
+            </div>
+            
+            <div class="step">
+                <strong>Step 4:</strong> Try quick booking: "ride from Ikoyi to Victoria Island"
+            </div>
+            
+            <div class="step">
+                <strong>Step 5:</strong> Select your ride type and watch the magic! ✨
+            </div>
+        </div>
+        
+        <div class="social-proof">
+            <h2>🚀 Why Fast Cab?</h2>
+            <p><strong>No App Download:</strong> Works directly in WhatsApp</p>
+            <p><strong>Lagos-First:</strong> Built specifically for Lagos traffic & routes</p>
+            <p><strong>Transparent:</strong> Upfront pricing with no surge surprises</p>
+            <p><strong>Fast Demo:</strong> Complete ride simulation in ~30 seconds</p>
+            <br>
+            <p><em>This is an MVP demo for validation. Share your feedback after testing!</em></p>
+        </div>
+    </div>
+    
+    <script>
+        function startDemo() {
+            // WhatsApp business number and pre-filled message
+            const whatsappNumber = "14155238886";
+            const message = "Hi! I want to try the Fast Cab demo";
+            
+            // Create WhatsApp URL
+            const whatsappURL = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+            
+            // Try to open WhatsApp, with fallbacks
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                // On mobile, try WhatsApp app first, then web
+                window.location.href = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
+                
+                // Fallback to web WhatsApp after a short delay
+                setTimeout(() => {
+                    window.open(whatsappURL, '_blank');
+                }, 1000);
+            } else {
+                // On desktop, open web WhatsApp
+                window.open(whatsappURL, '_blank');
+            }
+            
+            // Update button text to show it worked
+            document.getElementById('demo-button').innerHTML = '✅ Opening WhatsApp...';
+            
+            // Reset button after a few seconds
+            setTimeout(() => {
+                document.getElementById('demo-button').innerHTML = '📱 Try Live Demo Now';
+            }, 3000);
+            
+            // Track demo starts (you can add analytics here)
+            console.log('Demo started from website');
         }
-
-        // Smooth scrolling for navigation links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
+        
+        // Add some interactive feedback
+        document.addEventListener('DOMContentLoaded', function() {
+            const button = document.getElementById('demo-button');
+            
+            button.addEventListener('mouseenter', function() {
+                this.innerHTML = '🚀 Start Demo Experience';
+            });
+            
+            button.addEventListener('mouseleave', function() {
+                this.innerHTML = '📱 Try Live Demo Now';
             });
         });
-
-        // Add scroll effect to header
-        window.addEventListener('scroll', function() {
-            const header = document.querySelector('header');
-            if (window.scrollY > 100) {
-                header.style.background = 'rgba(0, 200, 81, 0.95)';
-                header.style.backdropFilter = 'blur(10px)';
-            } else {
-                header.style.background = 'linear-gradient(135deg, #00C851 0%, #007E33 100%)';
-                header.style.backdropFilter = 'none';
+        
+        // Show sandbox join info if user might need it
+        function showSandboxInfo() {
+            alert('First time users: When WhatsApp opens, you may need to join the Twilio sandbox first. Look for a message like "join cap-pleasure" and send it before saying Hi!');
+        }
+        
+        // Add helpful tooltip
+        setTimeout(() => {
+            if (!localStorage.getItem('fastcab-demo-visited')) {
+                const tooltip = document.createElement('div');
+                tooltip.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: #333;
+                    color: white;
+                    padding: 1rem;
+                    border-radius: 10px;
+                    z-index: 1000;
+                    max-width: 300px;
+                    text-align: center;
+                `;
+                tooltip.innerHTML = `
+                    <h3>👋 Welcome to Fast Cab Demo!</h3>
+                    <p>Click the green button to test our WhatsApp ride-booking bot.</p>
+                    <button onclick="this.parentElement.remove()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 5px; background: white; cursor: pointer;">Got it!</button>
+                `;
+                document.body.appendChild(tooltip);
+                localStorage.setItem('fastcab-demo-visited', 'true');
             }
-        });
+        }, 2000);
     </script>
 </body>
 </html>
