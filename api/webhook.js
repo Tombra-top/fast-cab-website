@@ -5,18 +5,33 @@ const crypto = require('crypto');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
+// Demo Configuration - Optimized for public testing
+const DEMO_CONFIG = {
+  simulationMode: true,
+  fastSimulation: true, // Speeds up all timings for demo
+  driverArrivalTime: 10000, // 10 seconds instead of real minutes
+  tripDuration: 20000, // 20 seconds instead of real minutes
+  maxUsersPerHour: 1000, // Support many concurrent users
+  welcomeNewUsers: true, // Always welcome new users with demo info
+  autoResetAfterTrip: true // Auto return to main menu after completion
+};
+
 // Security and validation utilities
 const SECURITY = {
   maxMessageLength: 500,
-  rateLimitWindow: 60000, // 1 minute
-  maxRequestsPerWindow: 20,
-  allowedStates: ['greeting', 'main_menu', 'awaiting_booking', 'selecting_ride_type', 'confirming_booking', 'waiting_for_driver', 'driver_assigned', 'driver_arriving', 'trip_started', 'trip_completed'],
+  rateLimitWindow: 60000,
+  maxRequestsPerWindow: 50, // Increased for demo
+  allowedStates: [
+    'greeting', 'main_menu', 'awaiting_booking', 'selecting_ride_type', 
+    'confirming_booking', 'driver_assigned', 'driver_arriving', 'driver_arrived', 
+    'trip_started', 'trip_completed', 'demo_complete'
+  ],
   sanitizeInput: (input) => {
     return input.replace(/[<>\"'&]/g, '').trim().slice(0, 100);
   }
 };
 
-// Industry standard ride types with realistic pricing for Lagos
+// Industry standard ride types optimized for Lagos demo
 const RIDE_TYPES = {
   economy: {
     name: 'Economy',
@@ -50,13 +65,13 @@ const RIDE_TYPES = {
   }
 };
 
-// Database connection with connection pooling
+// Database connection
 function getDbConnection() {
   const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/fastcab.db' : path.join(process.cwd(), 'fastcab.db');
   return new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE);
 }
 
-// Enhanced database functions with error handling
+// Enhanced database functions
 function getUser(phone) {
   return new Promise((resolve, reject) => {
     const db = getDbConnection();
@@ -73,19 +88,28 @@ function getUser(phone) {
 function createUser(phone, name = null) {
   return new Promise((resolve, reject) => {
     const db = getDbConnection();
-    const stmt = db.prepare('INSERT INTO users (phone, name, created_at) VALUES (?, ?, datetime("now"))');
+    const stmt = db.prepare('INSERT OR IGNORE INTO users (phone, name, created_at, demo_user) VALUES (?, ?, datetime("now"), 1)');
     stmt.run([phone, name], function(err) {
       stmt.finalize();
-      db.close();
-      if (err) reject(err);
-      else resolve({ id: this.lastID, phone, name });
+      if (err) {
+        db.close();
+        reject(err);
+      } else {
+        // Get the user (either newly created or existing)
+        const getStmt = db.prepare('SELECT * FROM users WHERE phone = ?');
+        getStmt.get([phone], (err, row) => {
+          getStmt.finalize();
+          db.close();
+          if (err) reject(err);
+          else resolve(row);
+        });
+      }
     });
   });
 }
 
 function updateConversationState(userId, state, data = null) {
   return new Promise((resolve, reject) => {
-    // Validate state
     if (!SECURITY.allowedStates.includes(state)) {
       reject(new Error('Invalid state'));
       return;
@@ -144,8 +168,8 @@ function createRide(userId, driverId, pickup, destination, rideType, estimatedFa
     const bookingId = generateBookingId();
     const db = getDbConnection();
     const stmt = db.prepare(`INSERT INTO rides (booking_id, user_id, driver_id, pickup_location, 
-                           destination, ride_type, estimated_fare, status, created_at) 
-                           VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', datetime("now"))`);
+                           destination, ride_type, estimated_fare, status, created_at, is_demo) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, 'confirmed', datetime("now"), 1)`);
     
     stmt.run([bookingId, userId, driverId, pickup, destination, rideType, estimatedFare], function(err) {
       stmt.finalize();
@@ -195,7 +219,7 @@ function updateRideStatus(bookingId, status, additionalData = {}) {
   });
 }
 
-// Initialize enhanced database with ride types
+// Initialize enhanced database for demo
 function initializeDatabase() {
   return new Promise((resolve, reject) => {
     const db = getDbConnection();
@@ -206,7 +230,8 @@ function initializeDatabase() {
         phone TEXT UNIQUE NOT NULL,
         name TEXT,
         created_at TEXT,
-        last_active TEXT
+        last_active TEXT,
+        demo_user INTEGER DEFAULT 1
       )`,
       `CREATE TABLE IF NOT EXISTS conversations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,6 +256,7 @@ function initializeDatabase() {
         created_at TEXT,
         updated_at TEXT,
         completed_at TEXT,
+        is_demo INTEGER DEFAULT 1,
         FOREIGN KEY (user_id) REFERENCES users (id),
         FOREIGN KEY (driver_id) REFERENCES drivers (id)
       )`,
@@ -275,22 +301,26 @@ function insertMockDrivers(db, resolve, reject) {
     }
 
     const drivers = [
-      // Economy drivers
+      // Economy drivers - Popular Lagos areas
       ['John Doe', '+234701234567', 'Toyota Corolla', 'LAG-123-AB', 'economy', 4.8, 245, 1, 'Lagos Island'],
       ['Jane Smith', '+234702345678', 'Honda Civic', 'LAG-456-CD', 'economy', 4.9, 189, 1, 'Victoria Island'],
       ['Mike Johnson', '+234703456789', 'Nissan Sentra', 'LAG-789-EF', 'economy', 4.7, 312, 1, 'Ikeja'],
       ['Sarah Wilson', '+234704567890', 'Toyota Vitz', 'LAG-012-GH', 'economy', 4.6, 167, 1, 'Lekki'],
+      ['Ahmed Hassan', '+234705678901', 'Hyundai Accent', 'LAG-345-IJ', 'economy', 4.8, 203, 1, 'Ikoyi'],
       
       // Comfort drivers
-      ['David Brown', '+234705678901', 'Toyota Camry', 'LAG-345-IJ', 'comfort', 4.8, 198, 1, 'Surulere'],
-      ['Grace Adebayo', '+234706789012', 'Honda Accord', 'LAG-678-KL', 'comfort', 4.9, 234, 1, 'Yaba'],
-      ['Samuel Okafor', '+234707890123', 'Hyundai Sonata', 'LAG-901-MN', 'comfort', 4.7, 156, 1, 'Gbagada'],
-      ['Fatima Hassan', '+234708901234', 'Toyota Avalon', 'LAG-234-OP', 'comfort', 4.8, 203, 1, 'Apapa'],
+      ['David Brown', '+234706789012', 'Toyota Camry', 'LAG-678-KL', 'comfort', 4.8, 198, 1, 'Surulere'],
+      ['Grace Adebayo', '+234707890123', 'Honda Accord', 'LAG-901-MN', 'comfort', 4.9, 234, 1, 'Yaba'],
+      ['Samuel Okafor', '+234708901234', 'Hyundai Sonata', 'LAG-234-OP', 'comfort', 4.7, 156, 1, 'Gbagada'],
+      ['Fatima Hassan', '+234709012345', 'Toyota Avalon', 'LAG-567-QR', 'comfort', 4.8, 203, 1, 'Apapa'],
+      ['Peter Eze', '+234710123456', 'Nissan Altima', 'LAG-890-ST', 'comfort', 4.7, 178, 1, 'Maryland'],
       
       // Premium drivers
-      ['Ahmed Bello', '+234709012345', 'Mercedes C-Class', 'LAG-567-QR', 'premium', 4.9, 145, 1, 'Ikoyi'],
-      ['Olumide Peters', '+234710123456', 'BMW 3 Series', 'LAG-890-ST', 'premium', 4.8, 178, 1, 'VI'],
-      ['Chioma Okeke', '+234711234567', 'Audi A4', 'LAG-123-UV', 'premium', 4.9, 134, 1, 'Lekki Phase 1']
+      ['Ahmed Bello', '+234711234567', 'Mercedes C-Class', 'LAG-123-UV', 'premium', 4.9, 145, 1, 'Ikoyi'],
+      ['Olumide Peters', '+234712345678', 'BMW 3 Series', 'LAG-456-WX', 'premium', 4.8, 178, 1, 'VI'],
+      ['Chioma Okeke', '+234713456789', 'Audi A4', 'LAG-789-YZ', 'premium', 4.9, 134, 1, 'Lekki Phase 1'],
+      ['Emeka Nwankwo', '+234714567890', 'Lexus ES', 'LAG-012-AA', 'premium', 4.8, 156, 1, 'Banana Island'],
+      ['Kemi Adebayo', '+234715678901', 'Mercedes E-Class', 'LAG-345-BB', 'premium', 4.9, 167, 1, 'Ikoyi']
     ];
 
     let insertCompleted = 0;
@@ -338,7 +368,6 @@ function generateBookingId() {
 }
 
 function parseRideRequest(message) {
-  // Parse messages like "ride from ikoyi to vi" or "book ride lagos island to lekki"
   const patterns = [
     /(?:ride|book)\s+(?:from\s+)?(.+?)\s+to\s+(.+)/i,
     /(.+?)\s+to\s+(.+)/i
@@ -368,9 +397,8 @@ function calculateFare(rideType, distance, duration) {
 }
 
 function generateRideOptions(pickup, destination) {
-  // Simulate distance and duration calculation
   const distance = Math.floor(Math.random() * 20) + 5; // 5-25 km
-  const baseDuration = Math.floor(distance * 2.5) + Math.floor(Math.random() * 10); // Realistic Lagos traffic
+  const baseDuration = Math.floor(distance * 2.5) + Math.floor(Math.random() * 10);
   
   let options = '';
   let optionData = {};
@@ -379,18 +407,26 @@ function generateRideOptions(pickup, destination) {
     const rideType = RIDE_TYPES[key];
     const fare = calculateFare(key, distance, baseDuration);
     const eta = Math.floor(Math.random() * (rideType.eta.max - rideType.eta.min)) + rideType.eta.min;
-    const duration = baseDuration + (index * 5); // Premium rides may take longer routes
+    const duration = baseDuration + (index * 5);
+    
+    // Convert to demo timings (seconds instead of minutes)
+    const demoEta = DEMO_CONFIG.fastSimulation ? Math.floor(eta / 6) : eta; // 10 seconds instead of 1 minute
+    const demoDuration = DEMO_CONFIG.fastSimulation ? Math.floor(duration / 3) : duration;
     
     options += `*${index + 1}. ${rideType.icon} ${rideType.name}*\n`;
     options += `   💰 ₦${fare.toLocaleString()}\n`;
-    options += `   ⏱️ ${eta} min pickup • ${duration} min trip\n`;
+    if (DEMO_CONFIG.fastSimulation) {
+      options += `   ⏱️ ${demoEta}s pickup • ${demoDuration}s trip *(Demo Mode)*\n`;
+    } else {
+      options += `   ⏱️ ${eta} min pickup • ${duration} min trip\n`;
+    }
     options += `   📝 ${rideType.description}\n\n`;
     
     optionData[index + 1] = {
       type: key,
       fare,
-      eta,
-      duration,
+      eta: demoEta,
+      duration: demoDuration,
       distance
     };
   });
@@ -402,7 +438,7 @@ function generateTrackingLink(bookingId) {
   return `https://fast-cab-website.vercel.app/track/${bookingId}`;
 }
 
-// Enhanced WhatsApp messaging with retry logic
+// Enhanced WhatsApp messaging
 async function sendWhatsAppMessage(to, message) {
   try {
     if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
@@ -410,7 +446,6 @@ async function sendWhatsAppMessage(to, message) {
       return { success: false, error: 'No credentials' };
     }
 
-    // Validate message length
     if (message.length > 1600) {
       message = message.substring(0, 1600) + '...';
     }
@@ -431,10 +466,87 @@ async function sendWhatsAppMessage(to, message) {
   }
 }
 
-// Main conversation handler with industry best practices
+// Demo simulation function - Fast-paced for public testing
+async function startDemoSimulation(bookingId, userPhone, driverName, vehicle, vehicleNumber, eta, pickup) {
+  try {
+    const phone = userPhone.replace('whatsapp:', '');
+    
+    // Driver arriving notification (fast demo timing)
+    setTimeout(async () => {
+      try {
+        await updateRideStatus(bookingId, 'driver_arrived');
+        const arrivalMessage = `🚗 *Driver Arrived!* *(Demo)*\n\n` +
+                             `${driverName} is at your pickup location\n` +
+                             `📍 ${pickup}\n` +
+                             `🚗 ${vehicle} (${vehicleNumber})\n\n` +
+                             `🎭 *This is a simulation for demo purposes*`;
+        await sendWhatsAppMessage(`whatsapp:${phone}`, arrivalMessage);
+        
+        // Trip start (5 seconds after arrival)
+        setTimeout(async () => {
+          await updateRideStatus(bookingId, 'trip_started');
+          const tripStartMessage = `🚀 *Trip Started!* *(Demo)*\n\n` +
+                                 `📍 Live tracking: ${generateTrackingLink(bookingId)}\n` +
+                                 `⏱️ Demo trip duration: ~15 seconds\n\n` +
+                                 `🛡️ *Safety features active*\n` +
+                                 `🎭 *Simulation in progress...*`;
+          await sendWhatsAppMessage(`whatsapp:${phone}`, tripStartMessage);
+          
+          // Trip completion (15 seconds after start)
+          setTimeout(async () => {
+            const completionTime = new Date().toISOString();
+            const actualFare = Math.floor(Math.random() * 200) + 800;
+            
+            await updateRideStatus(bookingId, 'completed', { 
+              actualFare, 
+              completedAt: completionTime 
+            });
+            
+            const completionMessage = `🎉 *Trip Completed!* *(Demo)*\n\n` +
+                                    `Thank you for testing Fast Cab! 🚖\n\n` +
+                                    `📋 *Demo Trip Summary*\n` +
+                                    `🆔 Booking: ${bookingId}\n` +
+                                    `💰 Fare: ₦${actualFare.toLocaleString()}\n\n` +
+                                    `✨ *What did you think?*\n` +
+                                    `• Professional booking flow?\n` +
+                                    `• Clear ride options?\n` +
+                                    `• Realistic driver experience?\n\n` +
+                                    `💬 Type *"book"* to try another ride!\n` +
+                                    `🔄 Or share your feedback with us!`;
+            
+            await sendWhatsAppMessage(`whatsapp:${phone}`, completionMessage);
+            
+            // Auto-reset to main menu after 5 seconds
+            setTimeout(async () => {
+              const resetMessage = `🚖 *Ready for Another Ride?*\n\n` +
+                                 `1️⃣ Book another ride\n` +
+                                 `2️⃣ Share feedback\n` +
+                                 `3️⃣ Learn about Fast Cab\n\n` +
+                                 `💬 Or type: "ride from [pickup] to [destination]"`;
+              await sendWhatsAppMessage(`whatsapp:${phone}`, resetMessage);
+              
+              // Reset user state to main_menu
+              const userObj = await getUser(phone);
+              if (userObj) {
+                await updateConversationState(userObj.id, 'main_menu', '{}');
+              }
+            }, 5000);
+            
+          }, 15000); // 15 seconds trip
+        }, 5000); // 5 seconds after arrival
+      } catch (error) {
+        console.error('Error in demo simulation:', error);
+      }
+    }, eta * 1000); // Use the calculated ETA in milliseconds
+    
+  } catch (error) {
+    console.error('Error starting demo simulation:', error);
+  }
+}
+
+// Main conversation handler optimized for demo
 async function handleWhatsAppMessage(from, body) {
   try {
-    // Security validations
     if (!from || !body) {
       throw new Error('Missing required parameters');
     }
@@ -446,7 +558,6 @@ async function handleWhatsAppMessage(from, body) {
 
     console.log(`📨 Processing: ${from} -> "${body}"`);
 
-    // Initialize database
     await initializeDatabase();
 
     const phoneNumber = from.replace('whatsapp:', '');
@@ -456,10 +567,9 @@ async function handleWhatsAppMessage(from, body) {
     let user = await getUser(phoneNumber);
     if (!user) {
       user = await createUser(phoneNumber);
-      console.log(`👤 New user: ${phoneNumber}`);
+      console.log(`👤 New demo user: ${phoneNumber}`);
     }
 
-    // Get conversation state
     const conversation = await getConversationState(user.id);
     const currentState = conversation.state || 'greeting';
     const conversationData = conversation.data ? JSON.parse(conversation.data) : {};
@@ -470,40 +580,43 @@ async function handleWhatsAppMessage(from, body) {
     let newState = currentState;
     let newData = conversationData;
 
-    // Enhanced conversation flow
+    // Enhanced conversation flow for demo
     switch (currentState) {
       case 'greeting':
-        if (/^(hi|hello|hey|start|book|ride)/i.test(message)) {
-          response = `🚖 *Welcome to Fast Cab*\n\n` +
-                    `Lagos' most reliable ride-hailing service! 🌟\n\n` +
-                    `*Quick Booking:*\n` +
-                    `📱 Type: *"ride from [pickup] to [destination]"*\n` +
-                    `Example: "ride from Ikoyi to VI"\n\n` +
+        if (/^(hi|hello|hey|start|book|ride|test|demo)/i.test(message)) {
+          response = `🚖 *Welcome to Fast Cab Demo!*\n\n` +
+                    `🎭 *This is a live simulation* for testing our ride-hailing platform!\n\n` +
+                    `✨ *Try our instant booking:*\n` +
+                    `📱 Type: *"ride from [pickup] to [destination]"*\n\n` +
+                    `🌟 *Popular Lagos routes:*\n` +
+                    `• "ride from Ikoyi to VI"\n` +
+                    `• "ride from Lekki to Ikeja"\n` +
+                    `• "ride from Lagos Island to Maryland"\n\n` +
                     `*Or choose an option:*\n` +
                     `1️⃣ Book a ride\n` +
-                    `2️⃣ Track my ride\n` +
-                    `3️⃣ My trips\n` +
-                    `4️⃣ Support\n\n` +
-                    `💬 *What would you like to do?*`;
+                    `2️⃣ See demo features\n` +
+                    `3️⃣ About Fast Cab\n\n` +
+                    `⚡ *Everything happens in seconds for demo!*`;
           newState = 'main_menu';
         } else {
-          response = `🚖 *Welcome to Fast Cab!*\n\nTo get started, say *"Hi"* or *"Book ride"* 👋`;
+          response = `🚖 *Welcome to Fast Cab Demo!*\n\n` +
+                    `🎭 This is a live simulation of our ride-hailing platform.\n\n` +
+                    `To get started, say *"Hi"* or *"Test"* 👋`;
         }
         break;
 
       case 'main_menu':
-        // Check for direct ride booking format
         const rideRequest = parseRideRequest(message);
         
         if (rideRequest) {
           const { options, optionData } = generateRideOptions(rideRequest.pickup, rideRequest.destination);
           
-          response = `🚗 *Available Rides*\n\n` +
+          response = `🚗 *Available Rides* *(Demo)*\n\n` +
                     `📍 *From:* ${rideRequest.pickup}\n` +
                     `📍 *To:* ${rideRequest.destination}\n\n` +
                     `${options}` +
-                    `💬 *Reply 1, 2, or 3 to select your ride*\n` +
-                    `📱 Or type *0* for main menu`;
+                    `⚡ *Demo Mode:* Times are in seconds for fast testing!\n\n` +
+                    `💬 *Reply 1, 2, or 3 to select your ride*`;
                     
           newState = 'selecting_ride_type';
           newData = {
@@ -511,74 +624,48 @@ async function handleWhatsAppMessage(from, body) {
             destination: rideRequest.destination,
             rideOptions: optionData
           };
-        } else if (/^[1-4]$/.test(message)) {
+        } else if (/^[1-3]$/.test(message)) {
           switch (message) {
             case '1':
-              response = `🚗 *Book Your Ride*\n\n` +
-                        `📱 *Quick booking format:*\n` +
+              response = `🚗 *Quick Ride Booking* *(Demo)*\n\n` +
+                        `📱 *Instant booking format:*\n` +
                         `"ride from [pickup] to [destination]"\n\n` +
-                        `*Examples:*\n` +
-                        `• ride from Lagos Island to VI\n` +
-                        `• book ride Ikoyi to Lekki\n` +
-                        `• Ikeja to Maryland\n\n` +
-                        `💬 *Type your pickup and destination*`;
+                        `🌟 *Try these Lagos routes:*\n` +
+                        `• ride from Ikoyi to VI\n` +
+                        `• ride from Lekki to Ikeja\n` +
+                        `• ride from Lagos Island to Maryland\n` +
+                        `• ride from Surulere to Yaba\n\n` +
+                        `💬 *Type your pickup and destination now!*`;
               newState = 'awaiting_booking';
-              break;
-            case '2':
-              response = `🔍 *Track Your Ride*\n\n` +
-                        `No active rides found.\n\n` +
-                        `Once you book a ride, you can track it here! 📍\n\n` +
-                        `💬 Reply *0* for main menu`;
-              break;
-            case '3':
-              response = `📋 *Your Trip History*\n\n` +
-                        `No completed trips yet.\n\n` +
-                        `Your ride history will appear here after your first trip! 🚗\n\n` +
-                        `💬 Reply *0* for main menu`;
-              break;
-            case '4':
-              response = `📞 *Fast Cab Support*\n\n` +
-                        `🕐 *Available 24/7*\n\n` +
-                        `📞 Call: +234-800-FAST-CAB\n` +
-                        `📧 Email: support@fastcab.ng\n` +
-                        `💬 WhatsApp: This number\n\n` +
-                        `⚡ *Average response: 90 seconds*\n\n` +
-                        `💬 Reply *0* for main menu`;
-              break;
-          }
-        } else if (message === '0') {
-          response = `🚖 *Fast Cab Main Menu*\n\n` +
-                    `1️⃣ Book a ride\n` +
-                    `2️⃣ Track my ride\n` +
-                    `3️⃣ My trips\n` +
-                    `4️⃣ Support\n\n` +
-                    `💬 *Or type: "ride from [pickup] to [destination]"*`;
         } else {
-          response = `❓ *Invalid option*\n\n` +
-                    `📱 Type: "ride from [pickup] to [destination]"\n` +
-                    `🔢 Or reply 1, 2, 3, or 4\n\n` +
-                    `💡 Example: "ride from Ikoyi to VI"`;
+          response = `❓ *Try one of these:*\n\n` +
+                    `📱 "ride from Ikoyi to VI"\n` +
+                    `🔢 Reply 1, 2, or 3\n` +
+                    `📖 "about" for more info\n\n` +
+                    `💡 *Tip:* Use real Lagos locations for best demo experience!`;
         }
         break;
 
       case 'awaiting_booking':
         const bookingRequest = parseRideRequest(message);
         
-        if (message === '0') {
-          response = `🚖 *Back to Main Menu*\n\n` +
-                    `1️⃣ Book a ride\n2️⃣ Track my ride\n3️⃣ My trips\n4️⃣ Support\n\n` +
+        if (message === '0' || /menu/i.test(message)) {
+          response = `🚖 *Back to Demo Menu*\n\n` +
+                    `1️⃣ Book a ride\n` +
+                    `2️⃣ See demo features\n` +
+                    `3️⃣ About Fast Cab\n\n` +
                     `💬 *Or type: "ride from [pickup] to [destination]"*`;
           newState = 'main_menu';
           newData = {};
         } else if (bookingRequest) {
           const { options, optionData } = generateRideOptions(bookingRequest.pickup, bookingRequest.destination);
           
-          response = `🚗 *Available Rides*\n\n` +
+          response = `🚗 *Available Demo Rides*\n\n` +
                     `📍 *From:* ${bookingRequest.pickup}\n` +
                     `📍 *To:* ${bookingRequest.destination}\n\n` +
                     `${options}` +
-                    `💬 *Reply 1, 2, or 3 to select*\n` +
-                    `📱 Or type *0* for main menu`;
+                    `⚡ *Demo speeds: Pickup in seconds, not minutes!*\n\n` +
+                    `💬 *Reply 1, 2, or 3 to select*`;
                     
           newState = 'selecting_ride_type';
           newData = {
@@ -587,19 +674,22 @@ async function handleWhatsAppMessage(from, body) {
             rideOptions: optionData
           };
         } else {
-          response = `📍 *Please specify pickup and destination*\n\n` +
-                    `📱 Format: "ride from [pickup] to [destination]"\n\n` +
-                    `*Examples:*\n` +
-                    `• ride from Ikoyi to VI\n` +
-                    `• Lagos Island to Lekki\n\n` +
-                    `💬 Try again or type *0* for menu`;
+          response = `📍 *Please use this format:*\n\n` +
+                    `📱 "ride from [pickup] to [destination]"\n\n` +
+                    `🌟 *Lagos examples:*\n` +
+                    `• ride from Ikoyi to Victoria Island\n` +
+                    `• ride from Lekki to Ikeja\n` +
+                    `• ride from Lagos Island to Maryland\n\n` +
+                    `💬 *Try again or type "menu"*`;
         }
         break;
 
       case 'selecting_ride_type':
-        if (message === '0') {
-          response = `🚖 *Back to Main Menu*\n\n` +
-                    `1️⃣ Book a ride\n2️⃣ Track my ride\n3️⃣ My trips\n4️⃣ Support\n\n` +
+        if (message === '0' || /menu/i.test(message)) {
+          response = `🚖 *Back to Demo Menu*\n\n` +
+                    `1️⃣ Book a ride\n` +
+                    `2️⃣ See demo features\n` +
+                    `3️⃣ About Fast Cab\n\n` +
                     `💬 *Or type: "ride from [pickup] to [destination]"*`;
           newState = 'main_menu';
           newData = {};
@@ -607,31 +697,31 @@ async function handleWhatsAppMessage(from, body) {
           const selectedOption = newData.rideOptions[message];
           
           if (selectedOption) {
-            // Find available driver for selected ride type
+            // Find available driver for demo
             const drivers = await getAvailableDrivers(selectedOption.type, newData.pickup);
             
             if (drivers.length === 0) {
-              response = `😔 *No ${RIDE_TYPES[selectedOption.type].name} drivers available*\n\n` +
-                        `Try a different ride type or try again in 2-3 minutes.\n\n` +
-                        `⏰ *Peak hours:* 7-9 AM, 5-8 PM\n\n` +
-                        `💬 Reply *1* to try again or *0* for menu`;
+              response = `😔 *No ${RIDE_TYPES[selectedOption.type].name} drivers* *(Demo Issue)*\n\n` +
+                        `This shouldn't happen in demo mode!\n` +
+                        `Our mock drivers might be busy. 😄\n\n` +
+                        `💬 Reply *1* to try again or *menu* to go back`;
               newState = 'no_drivers';
             } else {
-              const selectedDriver = drivers[0]; // Get best available driver
+              const selectedDriver = drivers[Math.floor(Math.random() * drivers.length)]; // Random driver for variety
               
-              response = `✅ *Ride Confirmed!*\n\n` +
+              response = `✅ *Demo Ride Confirmed!*\n\n` +
                         `🚗 *${RIDE_TYPES[selectedOption.type].name}* - ₦${selectedOption.fare.toLocaleString()}\n` +
                         `📍 From: ${newData.pickup}\n` +
                         `📍 To: ${newData.destination}\n\n` +
-                        `👨‍✈️ *Your Driver*\n` +
+                        `👨‍✈️ *Your Demo Driver*\n` +
                         `📛 ${selectedDriver.name}\n` +
                         `🚗 ${selectedDriver.vehicle} (${selectedDriver.vehicle_number})\n` +
                         `⭐ ${selectedDriver.rating}/5 • ${selectedDriver.total_trips} trips\n` +
                         `📱 ${selectedDriver.phone}\n\n` +
-                        `⏱️ *Arriving in ${selectedOption.eta} minutes*\n\n` +
-                        `🔔 You'll be notified when driver arrives!`;
+                        `⚡ *Demo Mode:* Arriving in ${selectedOption.eta} seconds!\n\n` +
+                        `🎭 *Watch the magic happen...*`;
                         
-              // Create ride in database
+              // Create demo ride
               const ride = await createRide(user.id, selectedDriver.id, newData.pickup, 
                                          newData.destination, selectedOption.type, selectedOption.fare);
               
@@ -641,67 +731,134 @@ async function handleWhatsAppMessage(from, body) {
                 driverId: selectedDriver.id,
                 driverName: selectedDriver.name,
                 driverPhone: selectedDriver.phone,
-                vehicle: `${selectedDriver.vehicle} (${selectedDriver.vehicle_number})`,
+                vehicle: selectedDriver.vehicle,
+                vehicleNumber: selectedDriver.vehicle_number,
                 eta: selectedOption.eta,
                 fare: selectedOption.fare,
                 pickup: newData.pickup,
                 destination: newData.destination
               };
               
-              // Simulate driver arriving after ETA
-              setTimeout(async () => {
-                try {
-                  await updateRideStatus(ride.bookingId, 'driver_arrived');
-                  const arrivalMessage = `🚗 *Driver Arrived!*\n\n` +
-                                       `${selectedDriver.name} is waiting for you\n` +
-                                       `📍 Location: ${newData.pickup}\n` +
-                                       `🚗 ${selectedDriver.vehicle} (${selectedDriver.vehicle_number})\n` +
-                                       `📱 ${selectedDriver.phone}\n\n` +
-                                       `⏰ *Please come out in 2 minutes*`;
-                  await sendWhatsAppMessage(from, arrivalMessage);
-                } catch (error) {
-                  console.error('Error sending arrival notification:', error);
-                }
-              }, selectedOption.eta * 60 * 1000); // Convert minutes to milliseconds
+              // Start the demo simulation
+              await startDemoSimulation(
+                ride.bookingId,
+                from,
+                selectedDriver.name,
+                selectedDriver.vehicle,
+                selectedDriver.vehicle_number,
+                selectedOption.eta,
+                newData.pickup
+              );
             }
           }
         } else {
-          response = `❓ *Please select a valid option*\n\n` +
-                    `💬 Reply *1*, *2*, or *3* to choose your ride\n` +
-                    `📱 Or type *0* for main menu`;
+          response = `❓ *Please select a ride:*\n\n` +
+                    `💬 Reply *1*, *2*, or *3*\n` +
+                    `📱 Or type *menu* to go back`;
         }
         break;
 
       case 'driver_assigned':
-        if (message === '0') {
-          response = `🚖 *Your ride is active*\n\n` +
-                    `Driver: ${newData.driverName}\n` +
-                    `Vehicle: ${newData.vehicle}\n` +
-                    `Status: En route to pickup\n\n` +
-                    `💬 Type *track* to get tracking link`;
-        } else if (/track/i.test(message)) {
+        if (/track/i.test(message)) {
           const trackingLink = generateTrackingLink(newData.bookingId);
-          response = `📍 *Track Your Ride*\n\n` +
+          response = `📍 *Demo Tracking Link*\n\n` +
                     `🆔 Booking: ${newData.bookingId}\n` +
                     `🔗 Live tracking: ${trackingLink}\n\n` +
-                    `📱 You'll get updates as your trip progresses!`;
-        } else {
-          response = `🚗 *Your ride is confirmed*\n\n` +
+                    `🎭 *Note:* This is a demo link for simulation\n` +
+                    `📱 In production, this would show real-time GPS tracking!`;
+        } else if (/menu/i.test(message)) {
+          response = `🚗 *Demo ride is active!*\n\n` +
                     `Driver: ${newData.driverName}\n` +
-                    `ETA: ${newData.eta} minutes\n\n` +
-                    `💬 Type *track* for live updates`;
+                    `Vehicle: ${newData.vehicle} (${newData.vehicleNumber})\n` +
+                    `Status: En route (demo simulation)\n\n` +
+                    `💬 Type *track* for tracking link`;
+        } else if (/^(book|another|new)/i.test(message)) {
+          response = `🚗 *Your current demo ride is still active!*\n\n` +
+                    `Driver: ${newData.driverName} is coming to pick you up.\n\n` +
+                    `⏳ Please wait for the demo to complete, then you can book another ride!\n\n` +
+                    `💬 Type *track* to see tracking info`;
+        } else {
+          response = `🚗 *Your demo ride is confirmed!*\n\n` +
+                    `Driver: ${newData.driverName}\n` +
+                    `ETA: ${newData.eta} seconds (demo time)\n\n` +
+                    `💬 Type *track* for live updates or just wait for notifications! 🎭`;
+        }
+        break;
+
+      case 'trip_completed':
+      case 'demo_complete':
+        if (/^(book|ride|another|new)/i.test(message)) {
+          response = `🚗 *Ready for Another Demo Ride?*\n\n` +
+                    `📱 *Quick booking:* "ride from [pickup] to [destination]"\n\n` +
+                    `🌟 *Try different routes:*\n` +
+                    `• Different ride types (Economy/Comfort/Premium)\n` +
+                    `• Various Lagos locations\n` +
+                    `• Experience the full flow again!\n\n` +
+                    `💬 *What route would you like to try?*`;
+          newState = 'awaiting_booking';
+          newData = {};
+        } else if (/^[1-5]$/.test(message)) {
+          // Rating received
+          response = `⭐ *Thanks for rating ${message}/5 stars!*\n\n` +
+                    `🎉 Your feedback helps improve our demo!\n\n` +
+                    `🚖 *Ready for another ride?*\n` +
+                    `📱 Type: "ride from [pickup] to [destination]"\n\n` +
+                    `💬 Or type *feedback* to share detailed thoughts`;
+          newState = 'main_menu';
+          newData = {};
+        } else if (/feedback/i.test(message)) {
+          response = `💭 *We'd love your feedback!*\n\n` +
+                    `✨ *What did you think of:*\n` +
+                    `• The booking flow?\n` +
+                    `• Ride type selection?\n` +
+                    `• Driver details & communication?\n` +
+                    `• Overall user experience?\n\n` +
+                    `🚀 *This demo helps us build the best ride-hailing service for Lagos!*\n\n` +
+                    `💬 Share your thoughts or type *book* for another ride!`;
+        } else {
+          response = `🎉 *Demo completed successfully!*\n\n` +
+                    `💬 *What's next?*\n` +
+                    `📱 Type *book* for another demo ride\n` +
+                    `⭐ Rate your experience (1-5)\n` +
+                    `💭 Type *feedback* to share thoughts\n` +
+                    `📖 Type *about* to learn more`;
+          newState = 'main_menu';
+          newData = {};
+        }
+        break;
+
+      case 'no_drivers':
+        if (message === '1') {
+          response = `🚗 *Let's try the demo again!*\n\n` +
+                    `📱 *Format:* "ride from [pickup] to [destination]"\n\n` +
+                    `🌟 *Popular routes:*\n` +
+                    `• ride from Ikoyi to VI\n` +
+                    `• ride from Lekki to Ikeja\n\n` +
+                    `💬 *Type your route!*`;
+          newState = 'awaiting_booking';
+          newData = {};
+        } else if (/menu/i.test(message) || message === '0') {
+          response = `🚖 *Demo Menu*\n\n` +
+                    `1️⃣ Book a ride\n` +
+                    `2️⃣ See demo features\n` +
+                    `3️⃣ About Fast Cab\n\n` +
+                    `💬 *Or type: "ride from [pickup] to [destination]"*`;
+          newState = 'main_menu';
+          newData = {};
+        } else {
+          response = `💬 Reply *1* to try booking again or *menu* for main options`;
         }
         break;
 
       default:
-        response = `🚖 *Welcome back to Fast Cab!*\n\n` +
-                  `📱 Type: "ride from [pickup] to [destination]"\n\n` +
-                  `*Or choose:*\n` +
-                  `1️⃣ Book a ride\n` +
-                  `2️⃣ Track my ride\n` +
-                  `3️⃣ My trips\n` +
-                  `4️⃣ Support\n\n` +
-                  `💡 Example: "ride from Ikoyi to VI"`;
+        response = `🚖 *Welcome back to Fast Cab Demo!*\n\n` +
+                  `🎭 *This is a live simulation* of our ride platform\n\n` +
+                  `📱 *Quick booking:* "ride from [pickup] to [destination]"\n\n` +
+                  `*Popular test routes:*\n` +
+                  `• ride from Ikoyi to VI\n` +
+                  `• ride from Lekki to Ikeja\n` +
+                  `• ride from Lagos Island to Maryland\n\n` +
+                  `💬 *Try it now!*`;
         newState = 'main_menu';
         newData = {};
         break;
@@ -724,10 +881,9 @@ async function handleWhatsAppMessage(from, body) {
   } catch (error) {
     console.error('❌ Error in handleWhatsAppMessage:', error);
     
-    // Security: Don't expose internal errors to users
-    const errorResponse = `😔 *Service temporarily unavailable*\n\n` +
+    const errorResponse = `😔 *Demo temporarily unavailable*\n\n` +
                          `Please try again in a moment.\n\n` +
-                         `💬 Type *Hi* to restart or contact support`;
+                         `💬 Type *Hi* to restart or contact us for support`;
     await sendWhatsAppMessage(from, errorResponse);
     
     return { 
@@ -737,55 +893,7 @@ async function handleWhatsAppMessage(from, body) {
   }
 }
 
-// Simulate driver actions (for demo purposes)
-async function simulateDriverActions(bookingId, userPhone) {
-  try {
-    // Simulate trip start after driver arrival
-    setTimeout(async () => {
-      try {
-        await updateRideStatus(bookingId, 'trip_started');
-        const tripStartMessage = `🚀 *Trip Started!*\n\n` +
-                               `Your driver has started the trip to your destination.\n\n` +
-                               `📍 Live tracking: ${generateTrackingLink(bookingId)}\n` +
-                               `⏱️ ETA: ${Math.floor(Math.random() * 20) + 15} minutes\n\n` +
-                               `🛡️ *Safety features active*\n` +
-                               `📞 Emergency: Hold power button\n` +
-                               `📱 Share trip with contacts`;
-        
-        await sendWhatsAppMessage(`whatsapp:${userPhone}`, tripStartMessage);
-        
-        // Simulate trip completion
-        setTimeout(async () => {
-          const completionTime = new Date().toISOString();
-          const actualFare = Math.floor(Math.random() * 500) + 800; // Vary fare slightly
-          
-          await updateRideStatus(bookingId, 'completed', { 
-            actualFare, 
-            completedAt: completionTime 
-          });
-          
-          const completionMessage = `🎉 *Trip Completed!*\n\n` +
-                                  `Thank you for choosing Fast Cab! 🚖\n\n` +
-                                  `📋 *Trip Summary*\n` +
-                                  `🆔 Booking: ${bookingId}\n` +
-                                  `💰 Fare: ₦${actualFare.toLocaleString()}\n` +
-                                  `⭐ Rate your driver to help improve our service\n\n` +
-                                  `💬 Reply with 1-5 stars or type *book* for another ride`;
-          
-          await sendWhatsAppMessage(`whatsapp:${userPhone}`, completionMessage);
-        }, 15 * 60 * 1000); // 15 minutes trip duration
-        
-      } catch (error) {
-        console.error('Error in trip start simulation:', error);
-      }
-    }, 3 * 60 * 1000); // 3 minutes after driver arrival
-    
-  } catch (error) {
-    console.error('Error in driver simulation:', error);
-  }
-}
-
-// Enhanced webhook handler with security and compliance
+// Enhanced webhook handler for demo
 module.exports = async (req, res) => {
   const startTime = Date.now();
   const requestId = crypto.randomBytes(8).toString('hex');
@@ -797,15 +905,24 @@ module.exports = async (req, res) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Access-Control-Allow-Origin', 'https://fast-cab-website.vercel.app');
 
-  // Health check endpoint
+  // Health check with demo info
   if (req.method === 'GET') {
     const healthCheck = {
       status: 'healthy',
-      service: 'Fast Cab WhatsApp Bot',
-      version: '2.0.0',
+      service: 'Fast Cab Demo Bot',
+      version: '2.0.0-demo',
+      mode: 'simulation',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      demo: {
+        simulationMode: DEMO_CONFIG.simulationMode,
+        fastSimulation: DEMO_CONFIG.fastSimulation,
+        driverArrivalTime: `${DEMO_CONFIG.driverArrivalTime/1000}s`,
+        tripDuration: `${DEMO_CONFIG.tripDuration/1000}s`,
+        maxUsersPerHour: DEMO_CONFIG.maxUsersPerHour
+      },
       environment: {
         nodeVersion: process.version,
         platform: process.platform,
@@ -816,8 +933,20 @@ module.exports = async (req, res) => {
       },
       features: {
         rideTypes: Object.keys(RIDE_TYPES),
+        demoDrivers: 15,
         securityEnabled: true,
-        databaseInitialized: true
+        databaseInitialized: true,
+        multiUserSupport: true
+      },
+      instructions: {
+        testCommands: [
+          "Hi - Start the demo",
+          "ride from Ikoyi to VI - Quick booking",
+          "book - Manual booking flow",
+          "about - Learn about Fast Cab"
+        ],
+        whatsappNumber: "+1 415 523 8886",
+        joinCode: "join cap-pleasure"
       }
     };
     
@@ -827,9 +956,8 @@ module.exports = async (req, res) => {
   // Handle WhatsApp webhooks
   if (req.method === 'POST') {
     try {
-      // Parse and validate request body
       const body = parseBody(req.body);
-      console.log(`📨 [${requestId}] Webhook payload:`, {
+      console.log(`📨 [${requestId}] Demo webhook:`, {
         From: body.From,
         Body: body.Body ? `"${body.Body.substring(0, 50)}..."` : 'undefined',
         MessageSid: body.MessageSid
@@ -837,7 +965,6 @@ module.exports = async (req, res) => {
 
       const { From, Body, MessageSid } = body;
 
-      // Validate required fields
       if (!From || !Body) {
         console.log(`⚠️ [${requestId}] Missing required fields`);
         return res.status(200).json({ 
@@ -847,9 +974,8 @@ module.exports = async (req, res) => {
         });
       }
 
-      // Validate phone number format
       if (!From.startsWith('whatsapp:+')) {
-        console.log(`⚠️ [${requestId}] Invalid phone number format: ${From}`);
+        console.log(`⚠️ [${requestId}] Invalid phone format: ${From}`);
         return res.status(200).json({ 
           success: false, 
           error: 'Invalid phone format',
@@ -857,16 +983,16 @@ module.exports = async (req, res) => {
         });
       }
 
-      // Process the WhatsApp message
+      // Process the demo message
       const result = await handleWhatsAppMessage(From, Body);
       
       const processingTime = Date.now() - startTime;
-      console.log(`✅ [${requestId}] Processed in ${processingTime}ms`);
+      console.log(`✅ [${requestId}] Demo processed in ${processingTime}ms`);
       
-      // Always return 200 to Twilio to prevent retries
       return res.status(200).json({ 
         success: true, 
         processed: result.success,
+        mode: 'demo',
         processingTime,
         requestId,
         timestamp: new Date().toISOString()
@@ -874,12 +1000,12 @@ module.exports = async (req, res) => {
 
     } catch (error) {
       const processingTime = Date.now() - startTime;
-      console.error(`❌ [${requestId}] Webhook error (${processingTime}ms):`, error);
+      console.error(`❌ [${requestId}] Demo error (${processingTime}ms):`, error);
       
-      // Still return 200 to prevent Twilio retries
       return res.status(200).json({ 
         success: false, 
         error: 'Internal processing error',
+        mode: 'demo',
         processingTime,
         requestId,
         timestamp: new Date().toISOString()
@@ -887,11 +1013,52 @@ module.exports = async (req, res) => {
     }
   }
 
-  // Method not allowed
   console.log(`❌ [${requestId}] Method ${req.method} not allowed`);
   return res.status(405).json({ 
     error: 'Method not allowed',
     allowed: ['GET', 'POST'],
     requestId
   });
-};
+};_booking';
+              break;
+            case '2':
+              response = `✨ *Fast Cab Demo Features*\n\n` +
+                        `🚗 *3 Ride Types:* Economy, Comfort, Premium\n` +
+                        `💰 *Real-time Pricing:* Dynamic fare calculation\n` +
+                        `👨‍✈️ *Driver Profiles:* Name, rating, vehicle details\n` +
+                        `📍 *Live Tracking:* Shareable trip links\n` +
+                        `⚡ *Instant Booking:* One message to book\n` +
+                        `🛡️ *Safety Features:* Emergency contacts\n\n` +
+                        `🎭 *Demo speeds up everything for testing!*\n\n` +
+                        `💬 Try: "ride from Ikoyi to VI"`;
+              break;
+            case '3':
+              response = `🚖 *About Fast Cab*\n\n` +
+                        `🌟 Lagos' next-generation ride-hailing platform\n\n` +
+                        `✨ *What makes us different:*\n` +
+                        `• WhatsApp-first booking (no app needed)\n` +
+                        `• Transparent, upfront pricing\n` +
+                        `• Professional driver network\n` +
+                        `• Multiple ride categories\n` +
+                        `• Real-time tracking & updates\n\n` +
+                        `🚀 *Currently in development*\n` +
+                        `📱 This is our MVP demo for validation\n\n` +
+                        `💬 Ready to test? Type "book ride"!`;
+              break;
+          }
+        } else if (message === '0' || /menu/i.test(message)) {
+          response = `🚖 *Fast Cab Demo Menu*\n\n` +
+                    `1️⃣ Book a ride\n` +
+                    `2️⃣ See demo features\n` +
+                    `3️⃣ About Fast Cab\n\n` +
+                    `💬 *Or type: "ride from [pickup] to [destination]"*`;
+        } else if (/^(book|test|try)/i.test(message)) {
+          response = `🚗 *Let's Book Your Demo Ride!*\n\n` +
+                    `📱 *Format:* "ride from [pickup] to [destination]"\n\n` +
+                    `🌟 *Popular test routes:*\n` +
+                    `• ride from Ikoyi to VI\n` +
+                    `• ride from Lekki to Ikeja\n` +
+                    `• ride from Lagos Island to Maryland\n\n` +
+                    `💬 *Type your route now!*`;
+          newState = 'awaiting_booking';
+        }
