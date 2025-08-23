@@ -62,6 +62,41 @@
             100% { transform: scale(1); }
         }
         
+        .sandbox-steps {
+            background: linear-gradient(45deg, #25D366, #128C7E);
+            color: white;
+            padding: 2rem;
+            border-radius: 15px;
+            margin: 2rem 0;
+            text-align: left;
+        }
+        
+        .sandbox-step {
+            background: rgba(255, 255, 255, 0.1);
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            border-left: 4px solid white;
+        }
+        
+        .sandbox-code {
+            background: rgba(0, 0, 0, 0.3);
+            color: #00ff00;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            display: inline-block;
+            margin: 0.5rem 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .sandbox-code:hover {
+            background: rgba(0, 0, 0, 0.5);
+            transform: scale(1.05);
+        }
+        
         .cta-button {
             background: linear-gradient(45deg, #25D366, #128C7E);
             color: white;
@@ -83,26 +118,7 @@
             box-shadow: 0 15px 30px rgba(37, 211, 102, 0.4);
         }
         
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-        
-        .feature {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 1.5rem;
-            border-radius: 15px;
-            backdrop-filter: blur(5px);
-        }
-        
-        .feature-icon {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .instructions {
+        .step-by-step {
             background: rgba(255, 255, 255, 0.9);
             border-radius: 15px;
             padding: 2rem;
@@ -111,6 +127,8 @@
         }
         
         .step {
+            display: flex;
+            align-items: center;
             margin: 1rem 0;
             padding: 1rem;
             background: rgba(102, 126, 234, 0.1);
@@ -118,26 +136,52 @@
             border-left: 4px solid #667eea;
         }
         
-        .whatsapp-info {
-            background: #25D366;
+        .step-number {
+            background: #667eea;
             color: white;
-            padding: 1.5rem;
-            border-radius: 15px;
-            margin: 1rem 0;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+            flex-shrink: 0;
         }
         
-        .social-proof {
-            background: rgba(255, 255, 255, 0.9);
+        .qr-section {
+            background: white;
             border-radius: 15px;
             padding: 2rem;
             margin: 2rem 0;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #25D366;
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            transform: translateY(100px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        
+        .notification.show {
+            transform: translateY(0);
         }
         
         @media (max-width: 768px) {
             .container { padding: 1rem; }
             .hero { padding: 2rem 1rem; }
             .logo { font-size: 2rem; }
-            .cta-button { width: 100%; margin: 0.5rem 0; }
+            .cta-button { width: 90%; margin: 0.5rem 0; }
         }
     </style>
 </head>
@@ -146,161 +190,186 @@
         <div class="hero">
             <div class="logo">🚖 Fast Cab</div>
             <div class="demo-badge">🎭 LIVE DEMO</div>
-            <div class="tagline">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</div>
+            <div class="tagline">Lagos' WhatsApp Ride-Hailing Platform</div>
             
-            <!-- Fixed CTA Button with proper WhatsApp link -->
-            <a href="#" class="cta-button" onclick="startDemo()" id="demo-button">
-                📱 Try Live Demo Now
-            </a>
+            <!-- Sandbox Instructions -->
+            <div class="sandbox-steps">
+                <h3>📱 First-Time Setup (30 seconds):</h3>
+                
+                <div class="sandbox-step">
+                    <strong>Step 1:</strong> Click button below to open WhatsApp
+                </div>
+                
+                <div class="sandbox-step">
+                    <strong>Step 2:</strong> You'll see a sandbox message. Copy and send this code:
+                    <div class="sandbox-code" onclick="copySandboxCode()" id="sandbox-code">
+                        join cap-pleasure
+                    </div>
+                    <small>👆 Click to copy</small>
+                </div>
+                
+                <div class="sandbox-step">
+                    <strong>Step 3:</strong> Wait for confirmation, then say "Hi" to start demo!
+                </div>
+            </div>
             
-            <div class="whatsapp-info">
-                <h3>📱 How to Test:</h3>
-                <p><strong>1.</strong> Click "Try Live Demo Now" above</p>
-                <p><strong>2.</strong> Join WhatsApp sandbox if prompted</p>
-                <p><strong>3.</strong> Say "Hi" to start the demo</p>
-                <p><strong>4.</strong> Try: "ride from Ikoyi to VI"</p>
+            <button class="cta-button" onclick="startDemo()" id="demo-button">
+                📱 Open WhatsApp Demo
+            </button>
+            
+            <p style="font-size: 0.9rem; color: #666; margin-top: 1rem;">
+                ⏱️ One-time setup • Works for 72 hours • No app download needed
+            </p>
+        </div>
+        
+        <!-- Step by step visual guide -->
+        <div class="step-by-step">
+            <h2>🎯 Complete Demo Guide</h2>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <div>
+                    <strong>Open WhatsApp</strong><br>
+                    <small>Click "Open WhatsApp Demo" button above</small>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <div>
+                    <strong>Join Sandbox</strong><br>
+                    <small>Send: <code>join cap-pleasure</code> (first time only)</small>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">3</div>
+                <div>
+                    <strong>Start Demo</strong><br>
+                    <small>Send: <code>Hi</code> to activate the bot</small>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">4</div>
+                <div>
+                    <strong>Book Ride</strong><br>
+                    <small>Try: <code>ride from Ikoyi to Victoria Island</code></small>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">5</div>
+                <div>
+                    <strong>Watch Magic</strong><br>
+                    <small>Select ride type → Driver assigned → Trip simulation (30s)</small>
+                </div>
             </div>
         </div>
         
-        <div class="features">
-            <div class="feature">
-                <div class="feature-icon">⚡</div>
-                <h3>Instant Booking</h3>
-                <p>One message to book: "ride from A to B"</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🚗</div>
-                <h3>3 Ride Types</h3>
-                <p>Economy, Comfort & Premium options</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">💰</div>
-                <h3>Upfront Pricing</h3>
-                <p>See exact fare before you book</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">👨‍✈️</div>
-                <h3>Driver Profiles</h3>
-                <p>Name, rating, vehicle & phone number</p>
-            </div>
-        </div>
-        
-        <div class="instructions">
-            <h2>🎯 Demo Instructions</h2>
+        <!-- QR Code Alternative -->
+        <div class="qr-section">
+            <h3>📱 Mobile Users: Scan QR Code</h3>
+            <p>Scan this with your phone camera for instant setup:</p>
             
-            <div class="step">
-                <strong>Step 1:</strong> Click "Try Live Demo Now" to open WhatsApp
+            <!-- You'll need to generate this QR code with your sandbox details -->
+            <div style="margin: 1rem 0; padding: 2rem; border: 2px dashed #ccc; border-radius: 10px;">
+                <p>📱 QR Code will appear here</p>
+                <small>Generate at: console.twilio.com → WhatsApp Sandbox</small>
             </div>
             
-            <div class="step">
-                <strong>Step 2:</strong> If first time, join sandbox with the code shown
-            </div>
-            
-            <div class="step">
-                <strong>Step 3:</strong> Send "Hi" to start the demo
-            </div>
-            
-            <div class="step">
-                <strong>Step 4:</strong> Try quick booking: "ride from Ikoyi to Victoria Island"
-            </div>
-            
-            <div class="step">
-                <strong>Step 5:</strong> Select your ride type and watch the magic! ✨
-            </div>
-        </div>
-        
-        <div class="social-proof">
-            <h2>🚀 Why Fast Cab?</h2>
-            <p><strong>No App Download:</strong> Works directly in WhatsApp</p>
-            <p><strong>Lagos-First:</strong> Built specifically for Lagos traffic & routes</p>
-            <p><strong>Transparent:</strong> Upfront pricing with no surge surprises</p>
-            <p><strong>Fast Demo:</strong> Complete ride simulation in ~30 seconds</p>
-            <br>
-            <p><em>This is an MVP demo for validation. Share your feedback after testing!</em></p>
+            <p><small>QR code automatically sends the join code for you!</small></p>
         </div>
     </div>
     
+    <div id="notification" class="notification">
+        <strong>📋 Code Copied!</strong><br>
+        Paste in WhatsApp to join sandbox
+    </div>
+    
     <script>
-        function startDemo() {
-            // WhatsApp business number and pre-filled message
-            const whatsappNumber = "14155238886";
-            const message = "Hi! I want to try the Fast Cab demo";
-            
-            // Create WhatsApp URL
-            const whatsappURL = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-            
-            // Try to open WhatsApp, with fallbacks
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            if (isMobile) {
-                // On mobile, try WhatsApp app first, then web
-                window.location.href = `whatsapp://send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`;
-                
-                // Fallback to web WhatsApp after a short delay
+        // Get your actual sandbox code from Twilio Console
+        const SANDBOX_CODE = "cap-pleasure"; // Replace with your actual code
+        
+        function copySandboxCode() {
+            const code = `join ${SANDBOX_CODE}`;
+            navigator.clipboard.writeText(code).then(() => {
+                document.getElementById('notification').classList.add('show');
                 setTimeout(() => {
-                    window.open(whatsappURL, '_blank');
-                }, 1000);
-            } else {
-                // On desktop, open web WhatsApp
-                window.open(whatsappURL, '_blank');
-            }
-            
-            // Update button text to show it worked
-            document.getElementById('demo-button').innerHTML = '✅ Opening WhatsApp...';
-            
-            // Reset button after a few seconds
-            setTimeout(() => {
-                document.getElementById('demo-button').innerHTML = '📱 Try Live Demo Now';
-            }, 3000);
-            
-            // Track demo starts (you can add analytics here)
-            console.log('Demo started from website');
+                    document.getElementById('notification').classList.remove('show');
+                }, 3000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = code;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                document.getElementById('notification').classList.add('show');
+                setTimeout(() => {
+                    document.getElementById('notification').classList.remove('show');
+                }, 3000);
+            });
         }
         
-        // Add some interactive feedback
-        document.addEventListener('DOMContentLoaded', function() {
+        function startDemo() {
+            const whatsappNumber = "14155238886";
+            const joinMessage = `join ${SANDBOX_CODE}`;
+            
+            // Create WhatsApp URL with join message pre-filled
+            const waUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(joinMessage)}`;
+            
+            // Open WhatsApp
+            window.open(waUrl, '_blank');
+            
+            // Update button
             const button = document.getElementById('demo-button');
+            button.innerHTML = '✅ WhatsApp Opened!';
+            button.style.background = 'linear-gradient(45deg, #128C7E, #25D366)';
             
-            button.addEventListener('mouseenter', function() {
-                this.innerHTML = '🚀 Start Demo Experience';
-            });
+            // Show helpful message
+            setTimeout(() => {
+                const notification = document.getElementById('notification');
+                notification.innerHTML = '<strong>📱 Next Step:</strong><br>Send the join code in WhatsApp!';
+                notification.style.background = '#ff9500';
+                notification.classList.add('show');
+            }, 2000);
             
-            button.addEventListener('mouseleave', function() {
-                this.innerHTML = '📱 Try Live Demo Now';
-            });
+            // Reset button
+            setTimeout(() => {
+                button.innerHTML = '📱 Open WhatsApp Demo';
+                button.style.background = 'linear-gradient(45deg, #25D366, #128C7E)';
+            }, 5000);
+        }
+        
+        // Auto-update sandbox code on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // You can fetch the actual sandbox code from your Twilio account
+            document.getElementById('sandbox-code').textContent = `join ${SANDBOX_CODE}`;
         });
         
-        // Show sandbox join info if user might need it
-        function showSandboxInfo() {
-            alert('First time users: When WhatsApp opens, you may need to join the Twilio sandbox first. Look for a message like "join cap-pleasure" and send it before saying Hi!');
-        }
-        
-        // Add helpful tooltip
+        // Show welcome message for returning users
         setTimeout(() => {
-            if (!localStorage.getItem('fastcab-demo-visited')) {
+            if (localStorage.getItem('fastcab-sandbox-joined')) {
                 const tooltip = document.createElement('div');
                 tooltip.style.cssText = `
                     position: fixed;
-                    top: 50%;
+                    top: 20px;
                     left: 50%;
-                    transform: translate(-50%, -50%);
-                    background: #333;
+                    transform: translateX(-50%);
+                    background: #25D366;
                     color: white;
-                    padding: 1rem;
-                    border-radius: 10px;
+                    padding: 1rem 2rem;
+                    border-radius: 50px;
                     z-index: 1000;
-                    max-width: 300px;
-                    text-align: center;
                 `;
-                tooltip.innerHTML = `
-                    <h3>👋 Welcome to Fast Cab Demo!</h3>
-                    <p>Click the green button to test our WhatsApp ride-booking bot.</p>
-                    <button onclick="this.parentElement.remove()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 5px; background: white; cursor: pointer;">Got it!</button>
-                `;
+                tooltip.innerHTML = '🎉 Welcome back! You can skip the sandbox step.';
                 document.body.appendChild(tooltip);
-                localStorage.setItem('fastcab-demo-visited', 'true');
+                setTimeout(() => tooltip.remove(), 5000);
             }
-        }, 2000);
+        }, 1000);
     </script>
 </body>
 </html>
