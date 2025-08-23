@@ -1,123 +1,228 @@
-// Fast Cab WhatsApp Webhook Handler - Fixed for Vercel
 const twilio = require('twilio');
 
-// Initialize Twilio client
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
+// Database functions (inline for serverless)
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 
-// Import database functions
-const { 
-  getUser, 
-  createUser, 
-  updateUser, 
-  getConversation, 
-  updateConversation, 
-  createRide, 
-  updateRide, 
-  getDrivers 
-} = require('./database');
-
-// Helper function to parse URL-encoded body
-function parseBody(body) {
-  const params = new URLSearchParams(body);
-  const result = {};
-  for (const [key, value] of params) {
-    result[key] = value;
-  }
-  return result;
+// Database connection
+function getDbConnection() {
+  const dbPath = process.env.NODE_ENV === 'production' ? '/tmp/fastcab.db' : path.join(process.cwd(), 'fastcab.db');
+  return new sqlite3.Database(dbPath);
 }
 
-// Helper function to send WhatsApp message
-async function sendMessage(to, message) {
-  try {
-    await client.messages.create({
-      body: message,
-      from: process.env.TWILIO_PHONE_NUMBER,
-      to: to
+// Database functions
+function getUser(phone) {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    db.get('SELECT * FROM users WHERE phone = ?', [phone], (err, row) => {
+      db.close();
+      if (err) reject(err);
+      else resolve(row);
     });
-    console.log(`✅ Message sent to ${to}`);
-  } catch (error) {
-    console.error(`❌ Error sending message:`, error);
-  }
+  });
 }
 
-// Main webhook handler
-module.exports = async (req, res) => {
-  try {
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+function createUser(phone, name = null) {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    const query = 'INSERT INTO users (phone, name, created_at) VALUES (?, ?, datetime("now"))';
+    db.run(query, [phone, name], function(err) {
+      db.close();
+      if (err) reject(err);
+      else resolve({ id: this.lastID, phone, name });
+    });
+  });
+}
 
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      return res.status(200).end();
-    }
+function updateConversationState(userId, state) {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    const query = `INSERT OR REPLACE INTO conversations (user_id, state, updated_at) 
+                   VALUES (?, ?, datetime("now"))`;
+    db.run(query, [userId, state], (err) => {
+      db.close();
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
 
-    // Handle GET requests (for testing)
-    if (req.method === 'GET') {
-      return res.status(200).json({
-        message: 'Fast Cab WhatsApp Webhook is working!',
-        timestamp: new Date().toISOString(),
-        environment: {
-          nodeVersion: process.version,
-          hasTwilioSid: !!process.env.TWILIO_ACCOUNT_SID,
-          hasTwilioToken: !!process.env.TWILIO_AUTH_TOKEN,
-          hasTwilioPhone: !!process.env.TWILIO_PHONE_NUMBER
+function getConversationState(userId) {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    db.get('SELECT state FROM conversations WHERE user_id = ?', [userId], (err, row) => {
+      db.close();
+      if (err) reject(err);
+      else resolve(row ? row.state : 'greeting');
+    });
+  });
+}
+
+function getDrivers() {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    db.all('SELECT * FROM drivers WHERE available = 1 ORDER BY rating DESC', (err, rows) => {
+      db.close();
+      if (err) reject(err);
+      else resolve(rows || []);
+    });
+  });
+}
+
+function createRide(userId, driverId, pickup, destination) {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    const query = `INSERT INTO rides (user_id, driver_id, pickup_location, destination, status, created_at) 
+                   VALUES (?, ?, ?, ?, 'pending', datetime("now"))`;
+    db.run(query, [userId, driverId, pickup, destination], function(err) {
+      db.close();
+      if (err) reject(err);
+      else resolve({ id: this.lastID, userId, driverId, pickup, destination, status: 'pending' });
+    });
+  });
+}
+
+// Initialize database tables if they don't exist
+function initializeDatabase() {
+  return new Promise((resolve, reject) => {
+    const db = getDbConnection();
+    
+    const tables = [
+      `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone TEXT UNIQUE NOT NULL,
+        name TEXT,
+        created_at TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        state TEXT DEFAULT 'greeting',
+        updated_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS rides (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        driver_id INTEGER,
+        pickup_location TEXT,
+        destination TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (driver_id) REFERENCES drivers (id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS drivers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT,
+        vehicle TEXT,
+        rating REAL DEFAULT 5.0,
+        available BOOLEAN DEFAULT 1,
+        location TEXT
+      )`
+    ];
+
+    let completed = 0;
+    tables.forEach(sql => {
+      db.run(sql, (err) => {
+        if (err) {
+          db.close();
+          reject(err);
+          return;
+        }
+        completed++;
+        if (completed === tables.length) {
+          // Insert mock drivers if none exist
+          db.get('SELECT COUNT(*) as count FROM drivers', (err, result) => {
+            if (!err && result.count === 0) {
+              const drivers = [
+                ['John Doe', '+234701234567', 'Toyota Corolla', 4.8, 1, 'Lagos Island'],
+                ['Jane Smith', '+234702345678', 'Honda Civic', 4.9, 1, 'Victoria Island'],
+                ['Mike Johnson', '+234703456789', 'Hyundai Elantra', 4.7, 1, 'Ikeja'],
+                ['Sarah Wilson', '+234704567890', 'Kia Rio', 4.6, 1, 'Lekki'],
+                ['David Brown', '+234705678901', 'Nissan Sentra', 4.8, 1, 'Surulere']
+              ];
+
+              let insertCompleted = 0;
+              drivers.forEach(driver => {
+                db.run('INSERT INTO drivers (name, phone, vehicle, rating, available, location) VALUES (?, ?, ?, ?, ?, ?)', 
+                  driver, (err) => {
+                    insertCompleted++;
+                    if (insertCompleted === drivers.length) {
+                      db.close();
+                      resolve();
+                    }
+                  });
+              });
+            } else {
+              db.close();
+              resolve();
+            }
+          });
         }
       });
-    }
-
-    // Handle POST requests (WhatsApp messages)
-    if (req.method === 'POST') {
-      console.log('📨 Received webhook request');
-      
-      // Parse the request body
-      let body;
-      if (typeof req.body === 'string') {
-        body = parseBody(req.body);
-      } else if (req.body && typeof req.body === 'object') {
-        body = req.body;
-      } else {
-        // If body is still undefined, it might be raw data
-        const chunks = [];
-        req.on('data', chunk => chunks.push(chunk));
-        req.on('end', () => {
-          const rawBody = Buffer.concat(chunks).toString();
-          body = parseBody(rawBody);
-          return handleWhatsAppMessage(body, res);
-        });
-        return;
-      }
-
-      return await handleWhatsAppMessage(body, res);
-    }
-
-    return res.status(405).json({ error: 'Method not allowed' });
-
-  } catch (error) {
-    console.error('❌ Webhook error:', error);
-    return res.status(500).json({
-      error: 'Internal server error',
-      message: error.message
     });
+  });
+}
+
+// Parse request body
+function parseBody(body) {
+  if (!body) return {};
+  
+  if (typeof body === 'object') return body;
+  
+  if (typeof body === 'string') {
+    try {
+      // Try JSON first
+      return JSON.parse(body);
+    } catch {
+      // Parse URL-encoded data
+      const params = new URLSearchParams(body);
+      const result = {};
+      for (const [key, value] of params) {
+        result[key] = value;
+      }
+      return result;
+    }
   }
-};
+  
+  return {};
+}
 
-async function handleWhatsAppMessage(body, res) {
+// Send WhatsApp message
+async function sendWhatsAppMessage(to, message) {
   try {
-    const { Body: message, From: from, To: to } = body;
-    
-    console.log(`📱 Message from ${from}: "${message}"`);
-
-    if (!message || !from) {
-      console.log('❌ Missing message or sender info');
-      return res.status(400).json({ error: 'Missing message or sender info' });
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      console.log('⚠️ Twilio credentials not found, skipping message send');
+      return { success: false, error: 'No credentials' };
     }
 
-    // Clean phone number (remove whatsapp: prefix)
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    
+    const result = await client.messages.create({
+      body: message,
+      from: process.env.TWILIO_PHONE_NUMBER || 'whatsapp:+14155238886',
+      to: to.startsWith('whatsapp:') ? to : `whatsapp:${to}`
+    });
+
+    console.log(`✅ Message sent successfully: ${result.sid}`);
+    return { success: true, sid: result.sid };
+  } catch (error) {
+    console.error('❌ Error sending message:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Handle WhatsApp messages
+async function handleWhatsAppMessage(from, body) {
+  try {
+    console.log(`📨 Processing message from ${from}: "${body}"`);
+
+    // Initialize database first
+    await initializeDatabase();
+
+    // Clean phone number
     const phoneNumber = from.replace('whatsapp:', '');
     
     // Get or create user
@@ -128,142 +233,248 @@ async function handleWhatsAppMessage(body, res) {
     }
 
     // Get conversation state
-    let conversation = await getConversation(user.id);
-    
-    const userMessage = message.trim().toLowerCase();
-    
+    const currentState = await getConversationState(user.id);
+    console.log(`💬 Current state for user ${user.id}: ${currentState}`);
+
+    let response = '';
+    let newState = currentState;
+
     // Handle conversation flow
-    if (!conversation || conversation.state === 'completed') {
-      // Start new conversation
-      if (userMessage.includes('hi') || userMessage.includes('hello') || userMessage.includes('start')) {
-        await updateConversation(user.id, 'menu', {});
-        await sendMessage(from, 
-          `🚖 Welcome to Fast Cab!\n\n` +
-          `1️⃣ Book a Ride\n` +
-          `2️⃣ Check Ride Status\n` +
-          `3️⃣ Support\n\n` +
-          `Reply with a number to continue.`
-        );
-      } else {
-        await sendMessage(from, 
-          `👋 Hi! Welcome to Fast Cab.\n\n` +
-          `Send "hi" to get started with booking your ride!`
-        );
-      }
-    }
-    else if (conversation.state === 'menu') {
-      if (userMessage === '1') {
-        await updateConversation(user.id, 'pickup_location', {});
-        await sendMessage(from, 
-          `📍 Great! Let's book your ride.\n\n` +
-          `Please share your pickup location:`
-        );
-      } else if (userMessage === '2') {
-        await sendMessage(from, 
-          `🚗 You don't have any active rides.\n\n` +
-          `Send "1" to book a new ride!`
-        );
-      } else if (userMessage === '3') {
-        await sendMessage(from, 
-          `📞 Fast Cab Support\n\n` +
-          `📧 Email: support@fastcab.ng\n` +
-          `📱 Phone: +234 901 234 5678\n\n` +
-          `Send "1" to book a ride.`
-        );
-      } else {
-        await sendMessage(from, 
-          `❌ Invalid option. Please choose:\n\n` +
-          `1️⃣ Book a Ride\n` +
-          `2️⃣ Check Ride Status\n` +
-          `3️⃣ Support`
-        );
-      }
-    }
-    else if (conversation.state === 'pickup_location') {
-      // Save pickup location and ask for destination
-      await updateConversation(user.id, 'destination_location', { 
-        pickup_location: message 
-      });
-      await sendMessage(from, 
-        `✅ Pickup: ${message}\n\n` +
-        `📍 Now, what's your destination?`
-      );
-    }
-    else if (conversation.state === 'destination_location') {
-      // Save destination and show drivers
-      const conversationData = conversation.data || {};
-      conversationData.destination_location = message;
-      
-      await updateConversation(user.id, 'selecting_driver', conversationData);
-      
-      const drivers = await getDrivers();
-      let driverMessage = `🚗 Available drivers:\n\n`;
-      
-      drivers.forEach((driver, index) => {
-        driverMessage += `${index + 1}️⃣ ${driver.name}\n`;
-        driverMessage += `⭐ ${driver.rating}/5 (${driver.trips} trips)\n`;
-        driverMessage += `💰 ₦${driver.price_per_km}/km\n`;
-        driverMessage += `🕐 ${driver.eta} mins away\n\n`;
-      });
-      
-      driverMessage += `Reply with driver number (1-5)`;
-      
-      await sendMessage(from, driverMessage);
-    }
-    else if (conversation.state === 'selecting_driver') {
-      const driverIndex = parseInt(userMessage) - 1;
-      const drivers = await getDrivers();
-      
-      if (driverIndex >= 0 && driverIndex < drivers.length) {
-        const selectedDriver = drivers[driverIndex];
-        const conversationData = conversation.data;
+    switch (currentState) {
+      case 'greeting':
+        if (body.toLowerCase().includes('hi') || body.toLowerCase().includes('hello') || body.toLowerCase().includes('hey')) {
+          response = `🚖 Welcome to Fast Cab! How can I help you today?
+
+1️⃣ Book a ride
+2️⃣ Track my ride
+3️⃣ Contact support
+4️⃣ Rate my last ride
+
+Reply with a number to continue.`;
+          newState = 'main_menu';
+        } else {
+          response = `🚖 Welcome to Fast Cab! 
+
+Please say "Hi" or "Hello" to get started.`;
+        }
+        break;
+
+      case 'main_menu':
+        switch (body.trim()) {
+          case '1':
+            response = `🚗 Great! Let's book you a ride.
+
+Please tell me your pickup location (e.g., Lagos Island, Victoria Island, Ikeja, etc.)`;
+            newState = 'waiting_pickup';
+            break;
+          case '2':
+            response = `🔍 Track Your Ride
+
+Sorry, you don't have any active rides to track right now.
+
+Reply with any key to return to the main menu.`;
+            newState = 'main_menu';
+            break;
+          case '3':
+            response = `📞 Contact Support
+
+For immediate assistance, please call: +234-800-FASTCAB
+
+Or email us at: support@fastcab.ng
+
+Reply with any key to return to the main menu.`;
+            newState = 'main_menu';
+            break;
+          case '4':
+            response = `⭐ Rate Your Last Ride
+
+You haven't taken any rides with us yet!
+
+Reply with any key to return to the main menu.`;
+            newState = 'main_menu';
+            break;
+          default:
+            response = `❓ Please choose a valid option (1, 2, 3, or 4):
+
+1️⃣ Book a ride
+2️⃣ Track my ride  
+3️⃣ Contact support
+4️⃣ Rate my last ride`;
+        }
+        break;
+
+      case 'waiting_pickup':
+        const pickup = body.trim();
+        response = `📍 Pickup: ${pickup}
+
+Now please tell me your destination.`;
         
-        // Create ride
-        const ride = await createRide(
-          user.id,
-          conversationData.pickup_location,
-          conversationData.destination_location,
-          selectedDriver.id
-        );
+        // Store pickup location temporarily (in a real app, you'd use a session store)
+        await updateConversationState(user.id, `waiting_destination:${pickup}`);
+        newState = `waiting_destination:${pickup}`;
+        break;
+
+      case (currentState.startsWith('waiting_destination:') ? currentState : ''):
+        const pickupLocation = currentState.split(':')[1];
+        const destination = body.trim();
         
-        await updateConversation(user.id, 'ride_booked', { ride_id: ride.id });
+        // Get available drivers
+        const drivers = await getDrivers();
         
-        await sendMessage(from,
-          `🎉 Ride booked successfully!\n\n` +
-          `👤 Driver: ${selectedDriver.name}\n` +
-          `📍 From: ${conversationData.pickup_location}\n` +
-          `📍 To: ${conversationData.destination_location}\n` +
-          `🕐 ETA: ${selectedDriver.eta} minutes\n` +
-          `📱 Driver will call you shortly.\n\n` +
-          `Ride ID: #${ride.id}\n\n` +
-          `Thank you for choosing Fast Cab! 🚖`
-        );
+        if (drivers.length === 0) {
+          response = `😔 Sorry, no drivers are currently available in your area.
+
+Please try again later or contact support.
+
+Reply with any key to return to the main menu.`;
+          newState = 'main_menu';
+        } else {
+          response = `🚗 Available drivers for your trip:
+📍 From: ${pickupLocation}
+📍 To: ${destination}
+
+`;
+          
+          drivers.slice(0, 3).forEach((driver, index) => {
+            response += `${index + 1}️⃣ ${driver.name}
+   🚗 ${driver.vehicle}
+   ⭐ ${driver.rating}/5.0
+   📍 Currently in ${driver.location}
+   
+`;
+          });
+          
+          response += `Please reply with the number of your preferred driver (1, 2, or 3).`;
+          
+          // Store trip details
+          await updateConversationState(user.id, `selecting_driver:${pickupLocation}:${destination}:${drivers.map(d => d.id).slice(0, 3).join(',')}`);
+          newState = `selecting_driver:${pickupLocation}:${destination}:${drivers.map(d => d.id).slice(0, 3).join(',')}`;
+        }
+        break;
+
+      case (currentState.startsWith('selecting_driver:') ? currentState : ''):
+        const [, pickup2, dest, driverIds] = currentState.split(':');
+        const driverIdArray = driverIds.split(',');
+        const selectedIndex = parseInt(body.trim()) - 1;
         
-        // Mark conversation as completed
-        await updateConversation(user.id, 'completed', {});
-      } else {
-        await sendMessage(from, 
-          `❌ Invalid driver selection. Please choose 1-5.`
-        );
-      }
-    }
-    else {
-      // Handle unexpected state
-      await updateConversation(user.id, 'menu', {});
-      await sendMessage(from, 
-        `🚖 Welcome back to Fast Cab!\n\n` +
-        `1️⃣ Book a Ride\n` +
-        `2️⃣ Check Ride Status\n` +
-        `3️⃣ Support\n\n` +
-        `Reply with a number to continue.`
-      );
+        if (selectedIndex >= 0 && selectedIndex < driverIdArray.length) {
+          const selectedDriverId = driverIdArray[selectedIndex];
+          
+          // Create the ride
+          const ride = await createRide(user.id, selectedDriverId, pickup2, dest);
+          
+          // Get driver details
+          const allDrivers = await getDrivers();
+          const selectedDriver = allDrivers.find(d => d.id == selectedDriverId);
+          
+          response = `🎉 Ride booked successfully!
+
+📋 Booking Details:
+🚗 Driver: ${selectedDriver.name}
+📱 Driver Phone: ${selectedDriver.phone}
+🚙 Vehicle: ${selectedDriver.vehicle}
+📍 Pickup: ${pickup2}
+📍 Destination: ${dest}
+🆔 Ride ID: #${ride.id}
+
+Your driver will arrive in approximately 10-15 minutes.
+
+Thank you for choosing Fast Cab! 🚖
+
+Reply with any key to return to the main menu.`;
+          
+          newState = 'main_menu';
+        } else {
+          response = `❓ Please select a valid driver option (1, 2, or 3).`;
+        }
+        break;
+
+      default:
+        response = `🚖 Welcome back to Fast Cab!
+
+1️⃣ Book a ride
+2️⃣ Track my ride
+3️⃣ Contact support  
+4️⃣ Rate my last ride
+
+Reply with a number to continue.`;
+        newState = 'main_menu';
     }
 
-    console.log('✅ Message processed successfully');
-    return res.status(200).json({ success: true });
+    // Update conversation state
+    await updateConversationState(user.id, newState);
+
+    // Send response
+    const result = await sendWhatsAppMessage(from, response);
+    
+    console.log(`✅ Conversation updated: ${user.id} -> ${newState}`);
+    return { success: true, response, result };
 
   } catch (error) {
     console.error('❌ Error processing message:', error);
-    return res.status(500).json({ error: error.message });
+    
+    // Send error message to user
+    await sendWhatsAppMessage(from, `😔 Sorry, something went wrong. Please try again or contact support.`);
+    
+    return { success: false, error: error.message };
   }
 }
+
+// Main webhook handler
+module.exports = async (req, res) => {
+  console.log(`📥 ${req.method} ${req.url} - ${new Date().toISOString()}`);
+
+  // Handle GET requests (health check)
+  if (req.method === 'GET') {
+    const healthCheck = {
+      message: "Fast Cab WhatsApp Webhook is working!",
+      timestamp: new Date().toISOString(),
+      environment: {
+        nodeVersion: process.version,
+        hasTwilioSid: !!process.env.TWILIO_ACCOUNT_SID,
+        hasTwilioToken: !!process.env.TWILIO_AUTH_TOKEN,
+        hasTwilioPhone: !!process.env.TWILIO_PHONE_NUMBER
+      }
+    };
+    
+    return res.status(200).json(healthCheck);
+  }
+
+  // Handle POST requests (webhooks)
+  if (req.method === 'POST') {
+    try {
+      const body = parseBody(req.body);
+      console.log('📨 Received webhook body:', body);
+
+      const { From, Body } = body;
+
+      if (!From || !Body) {
+        console.log('⚠️ Missing From or Body in request');
+        return res.status(400).json({ error: 'Missing From or Body' });
+      }
+
+      // Process the message
+      const result = await handleWhatsAppMessage(From, Body);
+      
+      // Always return 200 to Twilio
+      return res.status(200).json({ 
+        success: true, 
+        processed: result.success,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Webhook error:', error);
+      
+      // Still return 200 to prevent Twilio retries
+      return res.status(200).json({ 
+        success: false, 
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  // Method not allowed
+  return res.status(405).json({ error: 'Method not allowed' });
+};
