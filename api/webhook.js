@@ -1,5 +1,5 @@
 // Fast Cab - Complete Webhook with Twilio Client
-// Optimized for Vercel deployment
+// Optimized for Vercel deployment - FIXED TwiML Response
 
 const twilio = require('twilio');
 
@@ -213,7 +213,11 @@ export default async function handler(req, res) {
     const { Body: rawBody, From: from } = req.body;
     
     if (!rawBody || !from) {
-      return res.status(400).end('Missing required parameters');
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>❌ Invalid request format</Message>
+</Response>`;
+      return res.status(400).send(twiml);
     }
 
     const userPhone = from.replace('whatsapp:', '');
@@ -233,7 +237,7 @@ export default async function handler(req, res) {
     const session = getUserSession(userPhone);
     let responseMessage = '';
 
-    // Handle sandbox join - FIXED
+    // Handle sandbox join
     if (message.toLowerCase().includes('join cap-pleasure') || 
         message.toLowerCase().includes(`join ${SANDBOX_CODE}`) ||
         message.toLowerCase() === 'join cap-pleasure' ||
@@ -253,14 +257,14 @@ export default async function handler(req, res) {
 
 *Ready to experience the future of ride-hailing?*`;
       
-      // CRITICAL FIX: Properly update session
+      // Update session
       updateUserSession(userPhone, { 
         sandbox_joined: true, 
         conversation_state: 'sandbox_confirmed' 
       });
     }
     
-    // Handle greetings - FIXED
+    // Handle greetings
     else if (['hi', 'hello', 'start'].includes(message.toLowerCase())) {
       
       console.log(`[GREETING] User ${userPhone}, sandbox_joined: ${session.sandbox_joined}`);
@@ -299,7 +303,7 @@ export default async function handler(req, res) {
       }
     }
     
-    // Handle ride requests
+    // Handle ride requests (only if sandbox joined)
     else if (session.sandbox_joined) {
       const rideRequest = parseRideRequest(message);
       
@@ -471,7 +475,10 @@ Share your feedback on this demo!
 
 Or type *0* for main menu`;
       }
-    } else {
+    } 
+    
+    // Handle non-sandbox users
+    else {
       responseMessage = `🔒 *Sandbox Setup Required*
 
 To use Fast Cab demo, please:
@@ -485,26 +492,25 @@ To use Fast Cab demo, please:
 
 🎯 *Quick one-time setup!*`;
     }
-    // ...existing code...
-    }
-    // Add this block to send TwiML response to Twilio
+
+    // CRITICAL FIX: Always send TwiML response back to Twilio
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>${responseMessage}</Message>
 </Response>`;
+
+    console.log(`[WEBHOOK] Sending response to ${userPhone}: ${responseMessage.substring(0, 100)}...`);
+    
     return res.status(200).send(twiml);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).end('Internal Server Error');
+    console.error('[WEBHOOK ERROR]:', error);
+    
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>❌ Service temporarily unavailable. Please try again.</Message>
+</Response>`;
+    
+    return res.status(500).send(errorTwiml);
   }
-// ...existing code...
-// ...existing code...
-    }
-    // <-- End of try block
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).end('Internal Server Error');
-  }
-// ...existing code...
+}
