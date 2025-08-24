@@ -233,8 +233,14 @@ export default async function handler(req, res) {
     const session = getUserSession(userPhone);
     let responseMessage = '';
 
-    // Handle sandbox join
-    if (message.toLowerCase().includes('join cap-pleasure') || message.toLowerCase().includes(`join ${SANDBOX_CODE}`)) {
+    // Handle sandbox join - FIXED
+    if (message.toLowerCase().includes('join cap-pleasure') || 
+        message.toLowerCase().includes(`join ${SANDBOX_CODE}`) ||
+        message.toLowerCase() === 'join cap-pleasure' ||
+        message.toLowerCase() === `join ${SANDBOX_CODE}`) {
+      
+      console.log(`[SANDBOX] User ${userPhone} joined sandbox`);
+      
       responseMessage = `✅ *Great! You've joined the Fast Cab sandbox!*
 
 🎉 *Welcome to the demo!* You can now test our ride-hailing bot.
@@ -247,11 +253,18 @@ export default async function handler(req, res) {
 
 *Ready to experience the future of ride-hailing?*`;
       
-      updateUserSession(userPhone, { sandbox_joined: true, conversation_state: 'main_menu' });
+      // CRITICAL FIX: Properly update session
+      updateUserSession(userPhone, { 
+        sandbox_joined: true, 
+        conversation_state: 'sandbox_confirmed' 
+      });
     }
     
-    // Handle greetings
+    // Handle greetings - FIXED
     else if (['hi', 'hello', 'start'].includes(message.toLowerCase())) {
+      
+      console.log(`[GREETING] User ${userPhone}, sandbox_joined: ${session.sandbox_joined}`);
+      
       if (!session.sandbox_joined) {
         responseMessage = `🚖 *Welcome to Fast Cab Demo!*
 
@@ -458,7 +471,7 @@ Share your feedback on this demo!
 
 Or type *0* for main menu`;
       }
-   } else {
+    } else {
       responseMessage = `🔒 *Sandbox Setup Required*
 
 To use Fast Cab demo, please:
@@ -472,16 +485,3 @@ To use Fast Cab demo, please:
 
 🎯 *Quick one-time setup!*`;
     }
-
-    // Always send TwiML response to Twilio
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>${responseMessage}</Message>
-</Response>`;
-    return res.status(200).send(twiml);
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).end('Internal Server Error');
-  }
-}
