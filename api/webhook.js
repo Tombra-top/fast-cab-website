@@ -1,22 +1,25 @@
-// Fast Cab - OPTIMIZED User Experience
-// Intuitive flow with smart detection and guided experience
+// Fast Cab - Optimized Flow: New vs Returning Users
+// Clean separation of first-time setup vs returning user experience
 
 const twilio = require('twilio');
 
 // Configuration
 const SANDBOX_CODE = "cap-pleasure";
 const DEMO_TIMINGS = {
-  DRIVER_ARRIVAL: 8000,    // More realistic timing
+  DRIVER_ARRIVAL: 8000,
   TRIP_START: 5000,
-  TRIP_DURATION: 15000,
-  AUTO_RESET: 8000
+  TRIP_DURATION: 15000
 };
 
-// Enhanced rate limiting with user-friendly responses
-const requestCounts = new Map();
-const userSessions = new Map(); // Temporary session storage for user context
+// In-memory session tracking (survives across serverless calls using global)
+if (!global.userSessions) {
+  global.userSessions = new Map();
+}
+if (!global.requestCounts) {
+  global.requestCounts = new Map();
+}
 
-// Lagos locations with common aliases
+// Lagos locations with aliases
 const LAGOS_LOCATIONS = {
   'ikoyi': { name: 'Ikoyi', lat: 6.4511, lng: 3.4372 },
   'vi': { name: 'Victoria Island', lat: 6.4281, lng: 3.4219 },
@@ -26,133 +29,99 @@ const LAGOS_LOCATIONS = {
   'ikeja': { name: 'Ikeja', lat: 6.6018, lng: 3.3515 },
   'yaba': { name: 'Yaba', lat: 6.5158, lng: 3.3696 },
   'lagos island': { name: 'Lagos Island', lat: 6.4541, lng: 3.3947 },
-  'island': { name: 'Lagos Island', lat: 6.4541, lng: 3.3947 }, // Alias
+  'island': { name: 'Lagos Island', lat: 6.4541, lng: 3.3947 },
   'apapa': { name: 'Apapa', lat: 6.4474, lng: 3.3594 },
   'ajah': { name: 'Ajah', lat: 6.4698, lng: 3.6043 }
 };
 
-// Popular route suggestions for better UX
+// Popular routes for suggestions
 const POPULAR_ROUTES = [
-  { from: 'Ikoyi', to: 'Victoria Island', emoji: '🏢' },
-  { from: 'Lekki', to: 'Ikeja', emoji: '✈️' },
-  { from: 'Surulere', to: 'Yaba', emoji: '🎓' },
-  { from: 'Victoria Island', to: 'Lekki', emoji: '🏠' }
+  'ride from Ikoyi to VI',
+  'ride from Lekki to Ikeja', 
+  'ride from Surulere to Yaba',
+  'ride from VI to Lekki'
 ];
 
-// Simplified ride types with clear value propositions
+// Ride types
 const RIDE_TYPES = {
   'economy': {
     name: '🚗 Economy',
-    description: 'Budget-friendly • 2-4 mins ETA',
+    description: 'Budget-friendly • 2-4 mins',
     base_fare: 600,
-    per_km: 120,
-    emoji: '🚗'
+    per_km: 120
   },
   'comfort': {
     name: '🚙 Comfort',
     description: 'More space • AC guaranteed',
     base_fare: 900,
-    per_km: 180,
-    emoji: '🚙'
+    per_km: 180
   },
   'premium': {
     name: '🚕 Premium',
-    description: 'Luxury ride • Top drivers',
+    description: 'Luxury • Top drivers',
     base_fare: 1500,
-    per_km: 250,
-    emoji: '🚕'
+    per_km: 250
   }
 };
 
-// Demo drivers with more personality
+// Demo drivers
 const DEMO_DRIVERS = [
   {
-    id: 1,
     name: 'Emeka Johnson',
     phone: '+234701****890',
-    vehicle_make: 'Toyota',
-    vehicle_model: 'Corolla',
-    plate_number: 'LAG-234-XY',
+    vehicle: 'Toyota Corolla',
+    plate: 'LAG-234-XY',
     rating: 4.9,
-    total_trips: 1247,
-    greeting: "Welcome! I'm on my way 😊"
+    trips: 1247
   },
   {
-    id: 2,
     name: 'Fatima Abubakar',
     phone: '+234802****567',
-    vehicle_make: 'Honda',
-    vehicle_model: 'Civic',
-    plate_number: 'LAG-567-BC',
+    vehicle: 'Honda Civic',
+    plate: 'LAG-567-BC',
     rating: 4.8,
-    total_trips: 892,
-    greeting: "Hello! See you in a few minutes 👋"
+    trips: 892
   },
   {
-    id: 3,
     name: 'Samuel Okafor',
     phone: '+234703****234',
-    vehicle_make: 'Toyota',
-    vehicle_model: 'Camry',
-    plate_number: 'LAG-890-DE',
+    vehicle: 'Toyota Camry',
+    plate: 'LAG-890-DE',
     rating: 4.9,
-    total_trips: 1534,
-    greeting: "Good day! Almost there 🚗"
+    trips: 1534
   }
 ];
 
-// Smart message parsing with fuzzy matching
-function smartParseMessage(message) {
-  const msg = message.toLowerCase().trim();
-  
-  // Intent classification
-  const intents = {
-    greeting: ['hi', 'hello', 'start', 'hey', 'menu', 'begin'],
-    help: ['help', 'support', 'assist', 'guide'],
-    booking: ['ride', 'book', 'trip', 'go', 'from', 'to'],
-    selection: /^[1-3]$/,
-    sandbox: ['join', 'cap-pleasure', 'setup'],
-    cancel: ['cancel', 'stop', 'end', 'quit'],
-    status: ['status', 'where', 'eta', 'driver']
-  };
-  
-  // Check each intent
-  for (const [intent, patterns] of Object.entries(intents)) {
-    if (intent === 'selection' && patterns.test(msg)) {
-      return { intent: 'selection', value: msg };
-    }
-    if (Array.isArray(patterns) && patterns.some(p => msg.includes(p))) {
-      return { intent, message: msg };
-    }
-  }
-  
-  return { intent: 'unknown', message: msg };
+// CORE FUNCTIONS
+
+// Detect sandbox join messages
+function isSandboxJoinMessage(message) {
+  const msg = message.toLowerCase().replace(/\s/g, '');
+  const patterns = [
+    'joincap-pleasure',
+    'joincappleasure',
+    'cap-pleasure',
+    'cappleasure'
+  ];
+  return patterns.some(pattern => msg.includes(pattern));
 }
 
-// Enhanced ride request parsing with better location matching
+// Parse ride requests with smart location matching
 function parseRideRequest(message) {
-  const cleanMsg = message.toLowerCase().trim();
+  const msg = message.toLowerCase().trim();
   
-  // Multiple patterns to catch different ways users express rides
   const patterns = [
-    /(?:ride|book|trip|go)\s+from\s+([^to]+?)\s+to\s+(.+)/i,
-    /from\s+([^to]+?)\s+to\s+(.+)/i,
-    /book\s+([^to]+?)\s+to\s+(.+)/i,
-    /([a-zA-Z\s]+)\s+to\s+([a-zA-Z\s]+)/i,
-    /take me (?:from\s+)?([^to]+?)\s+to\s+(.+)/i
+    /(?:ride|book|trip|go)?\s*from\s+([^to]+?)\s+to\s+(.+)/i,
+    /([a-zA-Z\s]+)\s+to\s+([a-zA-Z\s]+)/i
   ];
   
   for (const pattern of patterns) {
-    const match = cleanMsg.match(pattern);
+    const match = msg.match(pattern);
     if (match && match[1] && match[2]) {
-      let pickup = match[1].trim();
-      let dropoff = match[2].trim();
+      const pickup = findLocation(match[1].trim());
+      const dropoff = findLocation(match[2].trim());
       
-      // Fuzzy location matching
-      pickup = findBestLocationMatch(pickup);
-      dropoff = findBestLocationMatch(dropoff);
-      
-      if (pickup && dropoff) {
+      if (pickup && dropoff && pickup !== dropoff) {
         return { pickup, dropoff };
       }
     }
@@ -160,49 +129,33 @@ function parseRideRequest(message) {
   return null;
 }
 
-// Fuzzy location matching for better UX
-function findBestLocationMatch(input) {
-  const searchTerm = input.toLowerCase().trim();
+// Smart location finder with fuzzy matching
+function findLocation(input) {
+  const term = input.toLowerCase().trim();
   
-  // Exact match first
-  if (LAGOS_LOCATIONS[searchTerm]) {
-    return searchTerm;
-  }
+  // Direct match
+  if (LAGOS_LOCATIONS[term]) return term;
   
-  // Partial matches
-  const matches = Object.keys(LAGOS_LOCATIONS).filter(loc => 
-    loc.includes(searchTerm) || searchTerm.includes(loc)
-  );
-  
-  if (matches.length === 1) {
-    return matches[0];
-  }
-  
-  // Common abbreviations
-  const abbreviations = {
+  // Abbreviations
+  const abbrev = {
     'vi': 'victoria island',
     'v.i': 'victoria island',
-    'v.i.': 'victoria island',
-    'island': 'lagos island'
+    'v.i.': 'victoria island'
   };
+  if (abbrev[term]) return abbrev[term];
   
-  if (abbreviations[searchTerm]) {
-    return abbreviations[searchTerm];
-  }
+  // Partial match
+  const matches = Object.keys(LAGOS_LOCATIONS).filter(loc => 
+    loc.includes(term) || term.includes(loc)
+  );
   
-  return null;
+  return matches.length === 1 ? matches[0] : null;
 }
 
-// Calculate distance with caching
-const distanceCache = new Map();
+// Calculate distance
 function calculateDistance(pickup, dropoff) {
-  const cacheKey = `${pickup}-${dropoff}`;
-  if (distanceCache.has(cacheKey)) {
-    return distanceCache.get(cacheKey);
-  }
-  
-  const p1 = LAGOS_LOCATIONS[pickup.toLowerCase()];
-  const p2 = LAGOS_LOCATIONS[dropoff.toLowerCase()];
+  const p1 = LAGOS_LOCATIONS[pickup];
+  const p2 = LAGOS_LOCATIONS[dropoff];
   
   if (!p1 || !p2) return 8;
   
@@ -213,56 +166,42 @@ function calculateDistance(pickup, dropoff) {
             Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
             Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const distance = Math.round(R * c * 10) / 10;
-  
-  distanceCache.set(cacheKey, distance);
-  return distance;
+  return Math.round(R * c * 10) / 10;
 }
 
 function calculateFare(rideType, distance) {
   const rate = RIDE_TYPES[rideType];
-  if (!rate) return 1000;
   return rate.base_fare + (rate.per_km * distance);
 }
 
-function generateBookingId() {
-  return 'FC' + Date.now().toString(36).substr(-6).toUpperCase();
-}
-
-// Enhanced rate limiting with context
+// Rate limiting
 function checkRateLimit(phone) {
   const now = Date.now();
-  const key = phone;
-  const requests = requestCounts.get(key) || [];
-  const recentRequests = requests.filter(time => now - time < 60000);
+  const requests = global.requestCounts.get(phone) || [];
+  const recent = requests.filter(time => now - time < 60000);
   
-  if (recentRequests.length > 20) { // More reasonable limit
-    return { allowed: false, count: recentRequests.length };
+  if (recent.length >= 25) {
+    return false;
   }
   
-  recentRequests.push(now);
-  requestCounts.set(key, recentRequests);
-  return { allowed: true, count: recentRequests.length };
+  recent.push(now);
+  global.requestCounts.set(phone, recent);
+  return true;
 }
 
-// Initialize Twilio client with better error handling
+// Initialize Twilio
 let twilioClient;
 try {
   if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
     twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  } else {
-    console.log('[INFO] Twilio credentials not found - running in development mode');
   }
 } catch (error) {
-  console.error('[TWILIO INIT ERROR]:', error);
+  console.error('[TWILIO INIT]:', error);
 }
 
-// Enhanced scheduled messaging with better error handling
+// Send scheduled messages
 async function sendScheduledMessage(to, message, delay) {
-  if (!twilioClient) {
-    console.log(`[DEV MODE] Would send: ${message}`);
-    return;
-  }
+  if (!twilioClient) return;
   
   setTimeout(async () => {
     try {
@@ -271,288 +210,289 @@ async function sendScheduledMessage(to, message, delay) {
         from: 'whatsapp:+14155238886',
         to: `whatsapp:${to}`
       });
-      console.log(`[SCHEDULED] Message sent to ${to.slice(-4)}`);
     } catch (error) {
-      console.error('[SCHEDULED ERROR]:', error.message);
+      console.error('[SCHEDULED ERROR]:', error);
     }
   }, delay);
 }
 
-// Generate welcome message with popular routes
-function generateWelcomeMessage() {
-  const routes = POPULAR_ROUTES.map(route => 
-    `${route.emoji} "${route.from} to ${route.to}"`
-  ).join('\n');
+// Check if user is connected to sandbox via Twilio API
+async function checkSandboxStatus(userPhone) {
+  if (!twilioClient) return true; // Dev mode - allow all
   
-  return `🚖 *Welcome to Fast Cab Demo!*
+  try {
+    const messages = await twilioClient.messages.list({
+      to: `whatsapp:${userPhone}`,
+      limit: 10
+    });
+    
+    // Look for Twilio confirmation messages
+    const hasConfirmation = messages.some(msg => 
+      msg.body && (
+        msg.body.includes('sandbox can now send') ||
+        msg.body.includes('You are all set') ||
+        msg.body.includes('joined the sandbox')
+      )
+    );
+    
+    return hasConfirmation;
+  } catch (error) {
+    console.error('[SANDBOX CHECK]:', error);
+    return false;
+  }
+}
 
-✨ *Ready to book a ride?*
+// Generate booking ID
+function generateBookingId() {
+  return 'FC' + Date.now().toString(36).substr(-6).toUpperCase();
+}
 
-🔥 *Popular routes - just copy & paste:*
-${routes}
+// MAIN WEBHOOK HANDLER
+export default async function handler(req, res) {
+  // Security headers
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  if (req.method !== 'POST') {
+    return res.status(405).send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Method not allowed</Message></Response>');
+  }
+
+  try {
+    const { Body: rawBody, From: from } = req.body;
+    
+    if (!rawBody || !from) {
+      return res.status(400).send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>Invalid request</Message></Response>');
+    }
+
+    const userPhone = from.replace('whatsapp:', '');
+    const message = rawBody.trim();
+
+    console.log(`\n📱 [${userPhone.slice(-4)}]: "${message}"`);
+
+    // Rate limiting
+    if (!checkRateLimit(userPhone)) {
+      return res.status(429).send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>⏳ Too many requests. Please wait a moment.</Message></Response>');
+    }
+
+    let responseMessage = '';
+
+    // PRIORITY 1: Handle sandbox join (new user connecting)
+    if (isSandboxJoinMessage(message)) {
+      console.log('✅ SANDBOX JOIN - New user connecting');
+      
+      // Mark user as connected
+      global.userSessions.set(userPhone, { 
+        connected: true, 
+        joinedAt: Date.now() 
+      });
+      
+      responseMessage = `✅ *Welcome to Fast Cab Demo!*
+
+🎉 *You're now connected!* 
+
+🚖 *Ready to book your first ride?*
+
+🔥 *Try these popular routes:*
+${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
+
+📍 *Available areas:*
+Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
+
+*Where would you like to go?*`;
+    }
+
+    // PRIORITY 2: Handle greetings (hi, hello, start)
+    else if (['hi', 'hello', 'start', 'hey', 'menu'].includes(message.toLowerCase().trim())) {
+      const session = global.userSessions.get(userPhone);
+      const isConnected = session?.connected || await checkSandboxStatus(userPhone);
+      
+      if (isConnected) {
+        console.log('👋 RETURNING USER - Direct to menu');
+        
+        // Update session if not already marked
+        if (!session?.connected) {
+          global.userSessions.set(userPhone, { 
+            connected: true, 
+            joinedAt: Date.now() 
+          });
+        }
+        
+        responseMessage = `🚖 *Welcome back to Fast Cab!*
+
+🔥 *Popular routes - just copy & send:*
+${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
 
 📍 *Or create your own:*
 💬 "ride from [pickup] to [destination]"
 
-⚡ *Available areas:* Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Ajah, Apapa
+⚡ *Available areas:*
+Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
 
-*Where would you like to go?*`;
-}
+*Where would you like to go today?*`;
+      } else {
+        console.log('🆕 NEW USER - Show setup');
+        
+        responseMessage = `🚖 *Welcome to Fast Cab Demo!*
 
-// Generate setup instructions
-function generateSetupMessage() {
-  return `🚖 *Fast Cab Demo Setup*
+⚠️ *Quick setup needed:*
 
-⚠️ *Quick one-time setup:*
-
-*Step 1:* Copy this exact message:
+*Step 1:* Copy this code:
 \`join cap-pleasure\`
 
 *Step 2:* Send it in this chat
 
 *Step 3:* Say "hi" again to start booking!
 
-🎯 *Takes 10 seconds • Works for 72 hours*
-⚡ *No app installation needed*
+🎯 *One-time setup • Takes 10 seconds*
+⚡ *No app download needed*
 
 *Send the join code to continue...*`;
-}
-
-// MAIN OPTIMIZED WEBHOOK HANDLER
-export default async function handler(req, res) {
-  // Security headers
-  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-
-  if (req.method !== 'POST') {
-    return res.status(405).send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response><Message>Method not allowed</Message></Response>`);
-  }
-
-  const startTime = Date.now();
-  
-  try {
-    const { Body: rawBody, From: from } = req.body;
-    
-    if (!rawBody || !from) {
-      return res.status(400).send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response><Message>Invalid request format</Message></Response>`);
+      }
     }
 
-    const userPhone = from.replace('whatsapp:', '');
-    const message = rawBody.trim();
-
-    console.log(`\n🔄 [${new Date().toISOString()}] ${userPhone.slice(-4)}: "${message}"`);
-
-    // Enhanced rate limiting
-    const rateLimitResult = checkRateLimit(userPhone);
-    if (!rateLimitResult.allowed) {
-      const waitMessage = `⏳ *Please slow down*\n\nYou've sent ${rateLimitResult.count} messages in the last minute.\n\n*Please wait 30 seconds and try again.*`;
-      return res.status(429).send(`<?xml version="1.0" encoding="UTF-8"?>
-<Response><Message>${waitMessage}</Message></Response>`);
-    }
-
-    // Parse user intent
-    const parsed = smartParseMessage(message);
-    let responseMessage = '';
-
-    console.log(`🧠 Intent detected: ${parsed.intent}`);
-
-    switch (parsed.intent) {
-      case 'sandbox':
-        // Handle sandbox join
-        console.log('✅ SANDBOX JOIN DETECTED');
-        userSessions.set(userPhone, { sandboxJoined: true, lastActivity: Date.now() });
+    // PRIORITY 3: Handle ride booking requests
+    else {
+      const rideRequest = parseRideRequest(message);
+      
+      if (rideRequest) {
+        console.log(`🚗 RIDE REQUEST: ${rideRequest.pickup} → ${rideRequest.dropoff}`);
         
-        responseMessage = `✅ *Perfect! You're all set!*
-
-${generateWelcomeMessage()}`;
-        break;
-
-      case 'greeting':
-        // Smart greeting based on context
-        const session = userSessions.get(userPhone);
-        if (session && session.sandboxJoined) {
-          responseMessage = generateWelcomeMessage();
-        } else {
-          responseMessage = generateSetupMessage();
-        }
-        break;
-
-      case 'booking':
-        // Handle ride booking
-        const rideRequest = parseRideRequest(message);
+        const { pickup, dropoff } = rideRequest;
+        const distance = calculateDistance(pickup, dropoff);
+        const pickupName = LAGOS_LOCATIONS[pickup].name;
+        const dropoffName = LAGOS_LOCATIONS[dropoff].name;
         
-        if (rideRequest) {
-          console.log(`🚗 RIDE REQUEST: ${rideRequest.pickup} → ${rideRequest.dropoff}`);
-          
-          const { pickup, dropoff } = rideRequest;
-          const distance = calculateDistance(pickup, dropoff);
-          const pickupName = LAGOS_LOCATIONS[pickup.toLowerCase()].name;
-          const dropoffName = LAGOS_LOCATIONS[dropoff.toLowerCase()].name;
-          
-          // Store ride context for selection
-          userSessions.set(userPhone, { 
-            pendingRide: { pickup, dropoff, distance, pickupName, dropoffName },
-            lastActivity: Date.now()
-          });
-          
-          responseMessage = `🚗 *Choose Your Ride*
+        // Store ride details for selection
+        global.userSessions.set(userPhone, {
+          connected: true,
+          pendingRide: { pickup, dropoff, distance, pickupName, dropoffName },
+          lastActivity: Date.now()
+        });
+        
+        responseMessage = `🚗 *Choose Your Ride*
 
 📍 *${pickupName}* → *${dropoffName}*
 📏 *Distance:* ~${distance}km
 
 `;
-          
-          let optionNumber = 1;
-          Object.entries(RIDE_TYPES).forEach(([key, ride]) => {
-            const fare = calculateFare(key, distance);
-            responseMessage += `*${optionNumber}. ${ride.name}*
+        
+        let optionNumber = 1;
+        Object.entries(RIDE_TYPES).forEach(([key, ride]) => {
+          const fare = calculateFare(key, distance);
+          responseMessage += `*${optionNumber}. ${ride.name}*
 💰 ₦${fare.toLocaleString()} • ${ride.description}
 
 `;
-            optionNumber++;
-          });
-          
-          responseMessage += `*Simply reply 1, 2, or 3 to book instantly! 🚀*`;
-        } else {
-          // Invalid location
-          responseMessage = `❌ *Location not recognized*
+          optionNumber++;
+        });
+        
+        responseMessage += `*Reply 1, 2, or 3 to book instantly! 🚀*`;
+      }
+      
+      // PRIORITY 4: Handle ride selection (1, 2, 3)
+      else if (['1', '2', '3'].includes(message.trim())) {
+        const session = global.userSessions.get(userPhone);
+        
+        if (!session?.pendingRide) {
+          responseMessage = `⚠️ *No pending booking*
 
-📍 *Available areas:*
-Ikoyi, Victoria Island (VI), Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
-
-🔥 *Try these examples:*
-💬 "ride from Ikoyi to VI"
-💬 "ride from Lekki to Ikeja"
-💬 "Surulere to Yaba"
+🚖 *Start a new booking:*
+${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
 
 *What's your pickup and destination?*`;
-        }
-        break;
+        } else {
+          console.log(`🎯 RIDE SELECTION: Option ${message}`);
+          
+          const { pendingRide } = session;
+          const selectedOption = parseInt(message);
+          const rideTypes = Object.keys(RIDE_TYPES);
+          const selectedRideKey = rideTypes[selectedOption - 1];
+          const selectedRide = RIDE_TYPES[selectedRideKey];
+          
+          const fare = calculateFare(selectedRideKey, pendingRide.distance);
+          const bookingId = generateBookingId();
+          const driver = DEMO_DRIVERS[Math.floor(Math.random() * DEMO_DRIVERS.length)];
+          
+          // Clear pending ride
+          global.userSessions.set(userPhone, { connected: true });
+          
+          responseMessage = `✅ *Ride Confirmed!*
 
-      case 'selection':
-        // Handle ride selection
-        const userSession = userSessions.get(userPhone);
-        if (!userSession || !userSession.pendingRide) {
-          responseMessage = `⚠️ *No pending booking found*\n\n${generateWelcomeMessage()}`;
-          break;
-        }
-
-        const { pendingRide } = userSession;
-        const selectedOption = parseInt(parsed.value);
-        const rideTypes = Object.keys(RIDE_TYPES);
-        const selectedRideKey = rideTypes[selectedOption - 1];
-        const selectedRide = RIDE_TYPES[selectedRideKey];
-        
-        const fare = calculateFare(selectedRideKey, pendingRide.distance);
-        const bookingId = generateBookingId();
-        const driver = DEMO_DRIVERS[Math.floor(Math.random() * DEMO_DRIVERS.length)];
-        
-        // Clear pending ride
-        userSessions.delete(userPhone);
-        
-        console.log(`🎯 RIDE CONFIRMED: ${selectedRide.name} - ₦${fare}`);
-        
-        responseMessage = `✅ *Ride Confirmed!*
-
-${selectedRide.emoji} *${selectedRide.name}* - ₦${fare.toLocaleString()}
+${selectedRide.name} - ₦${fare.toLocaleString()}
 📍 ${pendingRide.pickupName} → ${pendingRide.dropoffName}
 
 👨‍✈️ *Your Driver*
 📱 *${driver.name}*
-🚗 *${driver.vehicle_make} ${driver.vehicle_model}*
-🏷️ *${driver.plate_number}*
-⭐ *${driver.rating}/5* (${driver.total_trips} trips)
+🚗 *${driver.vehicle}*
+🏷️ *${driver.plate}*
+⭐ *${driver.rating}/5* (${driver.trips} trips)
 
-📍 *Booking ID:* ${bookingId}
+📍 *Booking:* ${bookingId}
 ⏰ *Arriving in 8 seconds...*
 
-🎭 *Demo experience starting!*`;
+🎭 *Demo starting now!*`;
 
-        // Enhanced demo sequence with personality
-        await sendScheduledMessage(userPhone, 
-          `🚗 *${driver.name} has arrived!*
+          // Automated demo sequence
+          await sendScheduledMessage(userPhone, 
+            `🚗 *Driver Arrived!*
 
-💬 *Driver says:* "${driver.greeting}"
-📍 *Location:* ${pendingRide.pickupName}
-🚗 *Look for:* ${driver.vehicle_make} ${driver.vehicle_model}
-🏷️ *Plate:* ${driver.plate_number}
+${driver.name} is waiting outside
+📍 *Pickup:* ${pendingRide.pickupName}
+🚗 *Vehicle:* ${driver.vehicle} (${driver.plate})
 
-⏰ *Starting trip in 5 seconds...*`, 
-          DEMO_TIMINGS.DRIVER_ARRIVAL);
+⏰ *Trip starting in 5 seconds...*`, 
+            DEMO_TIMINGS.DRIVER_ARRIVAL);
 
-        await sendScheduledMessage(userPhone,
-          `🚀 *Trip Started!*
+          await sendScheduledMessage(userPhone,
+            `🚀 *Trip Started!*
 
 📱 *Live tracking:* fast-cab.vercel.app/track/${bookingId}
 ⏱️ *ETA:* 15 seconds (demo mode)
-📍 *Heading to:* ${pendingRide.dropoffName}
-🛡️ *Safety features active*
+📍 *Destination:* ${pendingRide.dropoffName}
 
-🎵 *Enjoy your demo ride!*`,
-          DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START);
+🛡️ *Enjoy your safe ride!*`,
+            DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START);
 
-        await sendScheduledMessage(userPhone,
-          `🎉 *Trip Completed!*
+          await sendScheduledMessage(userPhone,
+            `🎉 *Trip Completed!*
 
 💰 *Total:* ₦${fare.toLocaleString()}
-📍 *Arrived at:* ${pendingRide.dropoffName}
-⏱️ *Trip time:* 15 seconds
-⭐ *Rate ${driver.name}:* Excellent! ⭐⭐⭐⭐⭐
+📍 *Arrived:* ${pendingRide.dropoffName}
+⏱️ *Duration:* 15 seconds
+⭐ *Rate ${driver.name}:* ⭐⭐⭐⭐⭐
 
-🎭 *Demo complete! Thanks for trying Fast Cab*
+🎭 *Demo complete!*
 
 🔥 *Book another ride?*
-${POPULAR_ROUTES.map(r => `💬 "${r.from} to ${r.to}"`).join('\n')}
+${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
 
-*Ready for your next demo ride?*`,
-          DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
-        break;
+*Ready for your next ride?*`,
+            DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
+        }
+      }
+      
+      // PRIORITY 5: Default/unrecognized messages
+      else {
+        console.log(`❓ UNRECOGNIZED: "${message}"`);
+        
+        responseMessage = `❓ *Not quite sure what you mean*
 
-      case 'help':
-        responseMessage = `🆘 *Fast Cab Demo Help*
+🚗 *To book a ride, try:*
+${POPULAR_ROUTES.slice(0, 3).map(route => `💬 "${route}"`).join('\n')}
 
-🚗 *How to book:*
-1️⃣ Say "ride from [pickup] to [destination]"
-2️⃣ Choose 1, 2, or 3 for ride type
-3️⃣ Watch the demo experience!
-
-📍 *Available areas:*
+📍 *Available locations:*
 Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
 
-🔥 *Quick examples:*
-💬 "Ikoyi to VI"
-💬 "Lekki to Ikeja"
-💬 "ride from Surulere to Yaba"
+💡 *Tip:* Say "ride from [pickup] to [destination]"
 
-*What would you like to try?*`;
-        break;
-
-      case 'cancel':
-        userSessions.delete(userPhone);
-        responseMessage = `✅ *Cancelled*\n\n${generateWelcomeMessage()}`;
-        break;
-
-      default:
-        responseMessage = `🤔 *Not quite sure what you mean*
-
-🚗 *To book a ride:*
-💬 "ride from Ikoyi to VI"
-💬 "Lekki to Ikeja"
-💬 "Surulere to Yaba"
-
-🆘 *Need help?* Just say "help"
-
-*What would you like to do?*`;
+*Where would you like to go?*`;
+      }
     }
 
-    const processingTime = Date.now() - startTime;
-    console.log(`⚡ Response (${processingTime}ms): Success`);
+    console.log(`✅ Response ready: ${responseMessage.substring(0, 50)}...`);
 
-    // Return optimized TwiML response
+    // Return TwiML response
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>${responseMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
@@ -561,13 +501,8 @@ Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
     return res.status(200).send(twiml);
 
   } catch (error) {
-    console.error(`❌ [ERROR]:`, error);
+    console.error('❌ [ERROR]:', error);
     
-    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>🔧 *Temporary issue* - Please try: "ride from Ikoyi to VI"</Message>
-</Response>`;
-    
-    return res.status(500).send(errorTwiml);
+    return res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>🔧 Temporary issue. Try: "ride from Ikoyi to VI"</Message></Response>');
   }
 }
