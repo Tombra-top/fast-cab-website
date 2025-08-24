@@ -196,6 +196,55 @@
         .notification.show {
             transform: translateX(0);
         }
+
+        .demo-flow {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem 0;
+            text-align: left;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 10px;
+        }
+
+        .flow-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+            flex-shrink: 0;
+        }
+
+        .sample-messages {
+            background: rgba(37, 211, 102, 0.1);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-left: 4px solid #25D366;
+        }
+
+        .message-example {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin: 0.5rem 0;
+            display: inline-block;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
         
         @media (max-width: 768px) {
             .container { padding: 1rem; }
@@ -214,21 +263,20 @@
             <div class="demo-badge">🎭 LIVE DEMO</div>
             <div class="tagline">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</div>
             
-            <!-- Fixed CTA Button -->
             <button class="cta-button" onclick="startDemo()" id="demo-button">
                 📱 Try Live Demo Now
             </button>
             
             <div class="sandbox-info">
-                <h3>📱 First-Time Setup (One-Click):</h3>
+                <h3>📱 First-Time Setup (30 seconds):</h3>
                 <p><strong>1.</strong> Click "Try Live Demo Now" above</p>
                 <p><strong>2.</strong> Copy & send this code: 
                     <span class="sandbox-code" onclick="copySandboxCode()" id="sandbox-code">
                         join cap-pleasure
                     </span>
                 </p>
-                <p><strong>3.</strong> Say "Hi" to start the demo</p>
-                <p><strong>4.</strong> Try: "ride from Ikoyi to VI"</p>
+                <p><strong>3.</strong> Say "Hi" to start booking rides</p>
+                <p><strong>✨ Demo runs automatically in 30 seconds!</strong></p>
             </div>
         </div>
         
@@ -254,43 +302,96 @@
                 <p>Name, rating, vehicle & phone number</p>
             </div>
         </div>
+
+        <div class="demo-flow">
+            <h2>🎯 30-Second Demo Experience</h2>
+            
+            <div class="flow-step">
+                <div class="flow-number">1</div>
+                <div>
+                    <strong>Quick Setup:</strong> Join sandbox (first time only)
+                    <div class="message-example">join cap-pleasure</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="flow-number">2</div>
+                <div>
+                    <strong>Start Demo:</strong> Say hi to activate
+                    <div class="message-example">Hi</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="flow-number">3</div>
+                <div>
+                    <strong>Book Ride:</strong> One message booking
+                    <div class="message-example">ride from Ikoyi to Victoria Island</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="flow-number">4</div>
+                <div>
+                    <strong>Choose Type:</strong> Select Economy, Comfort, or Premium
+                    <div class="message-example">1 (for Economy)</div>
+                </div>
+            </div>
+            
+            <div class="flow-step">
+                <div class="flow-number">5</div>
+                <div>
+                    <strong>Auto Demo:</strong> Watch driver assignment → arrival → trip completion
+                    <p style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+                        ✨ Fully automated - no input needed!
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="sample-messages">
+            <h3>💬 Try These Sample Bookings:</h3>
+            <div class="message-example">ride from Ikoyi to VI</div>
+            <div class="message-example">ride from Lekki to Ikeja</div>
+            <div class="message-example">ride from Surulere to Lagos Island</div>
+            <div class="message-example">ride from Ajah to Yaba</div>
+        </div>
         
         <div class="instructions">
-            <h2>🎯 Demo Instructions</h2>
+            <h2>🚀 What Makes Fast Cab Different?</h2>
             
             <div class="step">
-                <strong>Step 1:</strong> Click "Try Live Demo Now" to open WhatsApp
+                <strong>No App Download:</strong> Works directly in WhatsApp - the app Lagosians already use daily
             </div>
             
             <div class="step">
-                <strong>Step 2:</strong> If first time, copy and send: <code>join cap-pleasure</code>
+                <strong>Natural Language:</strong> Just say where you want to go, no complex forms
             </div>
             
             <div class="step">
-                <strong>Step 3:</strong> Send "Hi" to start the demo
+                <strong>Lightning Fast:</strong> From "Hi" to booked ride in 3 messages
             </div>
             
             <div class="step">
-                <strong>Step 4:</strong> Try quick booking: "ride from Ikoyi to Victoria Island"
+                <strong>Lagos-Optimized:</strong> Built specifically for Lagos routes, traffic patterns, and locations
             </div>
             
             <div class="step">
-                <strong>Step 5:</strong> Select your ride type and watch the magic! ✨
+                <strong>Transparent Pricing:</strong> See exact fare upfront, no surge surprises
             </div>
         </div>
         
         <div class="social-proof">
-            <h2>🚀 Why Fast Cab?</h2>
-            <p><strong>No App Download:</strong> Works directly in WhatsApp</p>
-            <p><strong>Lagos-First:</strong> Built specifically for Lagos traffic & routes</p>
-            <p><strong>Transparent:</strong> Upfront pricing with no surge surprises</p>
-            <p><strong>Fast Demo:</strong> Complete ride simulation in ~30 seconds</p>
+            <h2>🚀 Built for Lagos</h2>
+            <p><strong>No App Download:</strong> Works directly in WhatsApp - the app Lagosians already use daily</p>
+            <p><strong>Lagos-Optimized:</strong> Built specifically for Lagos routes, traffic patterns, and locations</p>
+            <p><strong>Lightning Fast:</strong> From "Hi" to booked ride in 3 messages</p>
+            <p><strong>Transparent Pricing:</strong> See exact fare upfront, no surge surprises</p>
             <br>
-            <p><em>This is an MVP demo for validation. Share your feedback after testing!</em></p>
+            <p><em>This is a functional MVP demo. Your feedback helps shape the future of ride-hailing in Lagos!</em></p>
         </div>
     </div>
     
-    <!-- Notification for feedback -->
     <div id="notification" class="notification">
         📋 Code copied! Paste in WhatsApp
     </div>
@@ -301,7 +402,6 @@
             navigator.clipboard.writeText(code).then(() => {
                 showNotification('📋 Code copied! Paste in WhatsApp');
             }).catch(() => {
-                // Fallback for older browsers
                 const textArea = document.createElement('textarea');
                 textArea.value = code;
                 document.body.appendChild(textArea);
@@ -326,14 +426,11 @@
             const whatsappNumber = "14155238886";
             const message = "Hi! I want to try the Fast Cab demo";
             
-            // Update button state
             button.classList.add('loading');
             button.innerHTML = '🔄 Opening WhatsApp...';
             
-            // Create WhatsApp URL
             const waUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
             
-            // Detect device and open appropriately
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             if (isMobile) {
@@ -342,22 +439,18 @@
                 window.open(waUrl, '_blank');
             }
             
-            // Show helpful notification
             setTimeout(() => {
-                showNotification('📱 WhatsApp opened! Follow the setup steps if needed.');
+                showNotification('📱 WhatsApp opened! Follow setup if first time, then say "Hi"');
             }, 1000);
             
-            // Reset button
             setTimeout(() => {
                 button.classList.remove('loading');
                 button.innerHTML = '📱 Try Live Demo Now';
             }, 5000);
             
-            // Track demo starts
             console.log('Fast Cab demo started');
         }
         
-        // Enhanced button interactions
         document.addEventListener('DOMContentLoaded', function() {
             const button = document.getElementById('demo-button');
             

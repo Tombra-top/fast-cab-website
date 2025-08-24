@@ -1,115 +1,28 @@
-const sqlite3 = require('sqlite3').verbose();
-const crypto = require('crypto');
+// Fast Cab - Complete Webhook with Twilio Client
+// Optimized for Vercel deployment
 
-// Your actual Twilio sandbox code (get from console.twilio.com)
-const SANDBOX_CODE = "cap-pleasure"; // Replace with your actual code
+const twilio = require('twilio');
 
-// Demo-optimized timings
+// Configuration
+const SANDBOX_CODE = "cap-pleasure";
 const DEMO_TIMINGS = {
   DRIVER_ARRIVAL: 8000,
-  TRIP_START: 5000,
+  TRIP_START: 5000, 
   TRIP_DURATION: 15000,
   AUTO_RESET: 8000
 };
 
-// Rate limiting for demo
+// In-memory session storage
+const userSessions = new Map();
+const rateLimitStore = new Map();
+
+// Rate limiting
 const RATE_LIMIT = {
   MAX_REQUESTS: 50,
   WINDOW_MS: 60000
 };
 
-const rateLimitStore = new Map();
-let db = new sqlite3.Database(':memory:');
-
-// Initialize database (same as before)
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    phone TEXT PRIMARY KEY,
-    conversation_state TEXT DEFAULT 'main_menu',
-    pickup_location TEXT,
-    dropoff_location TEXT,
-    selected_ride_type TEXT,
-    booking_id TEXT,
-    driver_id INTEGER,
-    sandbox_joined INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS bookings (
-    id TEXT PRIMARY KEY,
-    user_phone TEXT,
-    pickup_location TEXT,
-    dropoff_location TEXT,
-    ride_type TEXT,
-    fare INTEGER,
-    driver_id INTEGER,
-    status TEXT DEFAULT 'confirmed',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS drivers (
-    id INTEGER PRIMARY KEY,
-    name TEXT,
-    phone TEXT,
-    vehicle_make TEXT,
-    vehicle_model TEXT,
-    plate_number TEXT,
-    rating REAL,
-    total_trips INTEGER,
-    current_location TEXT,
-    is_available INTEGER DEFAULT 1
-  )`);
-
-  // Insert demo drivers
-  const drivers = [
-    [1, 'John Doe', '+2347012345671', 'Toyota', 'Corolla', 'LAG-123-AB', 4.8, 245, 'Ikoyi', 1],
-    [2, 'Mary Johnson', '+2347012345672', 'Honda', 'Civic', 'LAG-456-CD', 4.9, 189, 'Victoria Island', 1],
-    [3, 'David Wilson', '+2347012345673', 'Toyota', 'Camry', 'LAG-789-EF', 4.7, 312, 'Lekki', 1],
-    [4, 'Sarah Ahmed', '+2347012345674', 'Honda', 'Accord', 'LAG-321-GH', 4.9, 278, 'Surulere', 1],
-    [5, 'Mike Okafor', '+2347012345675', 'Mercedes', 'C-Class', 'LAG-654-IJ', 4.8, 156, 'Ikeja', 1],
-    [6, 'Grace Adebayo', '+2347012345676', 'BMW', '3 Series', 'LAG-987-KL', 4.9, 203, 'Lagos Island', 1]
-  ];
-
-  const stmt = db.prepare(`INSERT OR REPLACE INTO drivers 
-    (id, name, phone, vehicle_make, vehicle_model, plate_number, rating, total_trips, current_location, is_available) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-  
-  drivers.forEach(driver => {
-    stmt.run(driver);
-  });
-  stmt.finalize();
-});
-
-// Ride types and location data (same as before)
-const RIDE_TYPES = {
-  'economy': {
-    name: '🚗 Economy',
-    description: 'Affordable rides for everyday trips',
-    base_fare: 600,
-    per_km: 120,
-    pickup_time_min: 3,
-    pickup_time_max: 7
-  },
-  'comfort': {
-    name: '🚙 Comfort', 
-    description: 'More space and newer vehicles',
-    base_fare: 900,
-    per_km: 180,
-    pickup_time_min: 5,
-    pickup_time_max: 12
-  },
-  'premium': {
-    name: '🚕 Premium',
-    description: 'Luxury vehicles with top-rated drivers', 
-    base_fare: 1500,
-    per_km: 250,
-    pickup_time_min: 8,
-    pickup_time_max: 15
-  }
-};
-
+// Lagos locations
 const LAGOS_LOCATIONS = {
   'ikoyi': { name: 'Ikoyi', lat: 6.4511, lng: 3.4372 },
   'vi': { name: 'Victoria Island', lat: 6.4281, lng: 3.4219 },
@@ -123,7 +36,63 @@ const LAGOS_LOCATIONS = {
   'ajah': { name: 'Ajah', lat: 6.4698, lng: 3.6043 }
 };
 
-// Utility functions (same as before)
+// Ride types with pricing
+const RIDE_TYPES = {
+  'economy': {
+    name: '🚗 Economy',
+    description: 'Affordable rides for everyday trips',
+    base_fare: 600,
+    per_km: 120
+  },
+  'comfort': {
+    name: '🚙 Comfort',
+    description: 'More space and newer vehicles', 
+    base_fare: 900,
+    per_km: 180
+  },
+  'premium': {
+    name: '🚕 Premium',
+    description: 'Luxury vehicles with top-rated drivers',
+    base_fare: 1500,
+    per_km: 250
+  }
+};
+
+// Demo drivers
+const DEMO_DRIVERS = [
+  {
+    id: 1,
+    name: 'John Doe',
+    phone: '+2347012345671',
+    vehicle_make: 'Toyota',
+    vehicle_model: 'Corolla',
+    plate_number: 'LAG-123-AB',
+    rating: 4.8,
+    total_trips: 245
+  },
+  {
+    id: 2,
+    name: 'Mary Johnson', 
+    phone: '+2347012345672',
+    vehicle_make: 'Honda',
+    vehicle_model: 'Civic',
+    plate_number: 'LAG-456-CD',
+    rating: 4.9,
+    total_trips: 189
+  },
+  {
+    id: 3,
+    name: 'David Wilson',
+    phone: '+2347012345673', 
+    vehicle_make: 'Toyota',
+    vehicle_model: 'Camry',
+    plate_number: 'LAG-789-EF',
+    rating: 4.7,
+    total_trips: 312
+  }
+];
+
+// Utility functions
 function calculateDistance(pickup, dropoff) {
   const pickup_coords = LAGOS_LOCATIONS[pickup.toLowerCase()];
   const dropoff_coords = LAGOS_LOCATIONS[dropoff.toLowerCase()];
@@ -151,25 +120,7 @@ function calculateFare(rideType, distance) {
 }
 
 function generateBookingId() {
-  return 'FC' + crypto.randomBytes(5).toString('hex').toUpperCase();
-}
-
-function sanitizeInput(input) {
-  return input.trim().replace(/[<>\"'&]/g, '');
-}
-
-function checkRateLimit(phone) {
-  const now = Date.now();
-  const userRequests = rateLimitStore.get(phone) || [];
-  const validRequests = userRequests.filter(time => now - time < RATE_LIMIT.WINDOW_MS);
-  
-  if (validRequests.length >= RATE_LIMIT.MAX_REQUESTS) {
-    return false;
-  }
-  
-  validRequests.push(now);
-  rateLimitStore.set(phone, validRequests);
-  return true;
+  return 'FC' + Math.random().toString(36).substr(2, 6).toUpperCase();
 }
 
 function parseRideRequest(message) {
@@ -197,42 +148,53 @@ function validateLocation(location) {
   return LAGOS_LOCATIONS[location.toLowerCase()] !== undefined;
 }
 
-function scheduleAutomatedMessage(phone, message, delay, newState = null) {
-  setTimeout(() => {
-    console.log(`[SCHEDULED] Sending to ${phone}: ${message}`);
-    if (newState) {
-      updateUserState(phone, newState);
+function checkRateLimit(phone) {
+  const now = Date.now();
+  const userRequests = rateLimitStore.get(phone) || [];
+  const validRequests = userRequests.filter(time => now - time < RATE_LIMIT.WINDOW_MS);
+  
+  if (validRequests.length >= RATE_LIMIT.MAX_REQUESTS) {
+    return false;
+  }
+  
+  validRequests.push(now);
+  rateLimitStore.set(phone, validRequests);
+  return true;
+}
+
+function getUserSession(userPhone) {
+  if (!userSessions.has(userPhone)) {
+    userSessions.set(userPhone, {
+      conversation_state: 'main_menu',
+      sandbox_joined: false,
+      booking_data: {}
+    });
+  }
+  return userSessions.get(userPhone);
+}
+
+function updateUserSession(userPhone, updates) {
+  const session = getUserSession(userPhone);
+  Object.assign(session, updates);
+  userSessions.set(userPhone, session);
+}
+
+// Initialize Twilio client
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+async function sendScheduledMessage(to, message, delay) {
+  setTimeout(async () => {
+    try {
+      await client.messages.create({
+        body: message,
+        from: 'whatsapp:+14155238886',
+        to: `whatsapp:${to}`
+      });
+      console.log(`Scheduled message sent to ${to}`);
+    } catch (error) {
+      console.error('Error sending scheduled message:', error);
     }
   }, delay);
-}
-
-function updateUserState(phone, state, additionalData = {}) {
-  const updates = { conversation_state: state, updated_at: new Date().toISOString(), ...additionalData };
-  const setClause = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-  const values = Object.values(updates);
-  
-  db.run(`UPDATE users SET ${setClause} WHERE phone = ?`, [...values, phone]);
-}
-
-// New function to detect if user needs to join sandbox
-function needsSandboxJoin(message) {
-  const joinPatterns = [
-    /join\s+[\w-]+/i,
-    new RegExp(`join\\s+${SANDBOX_CODE}`, 'i')
-  ];
-  
-  return joinPatterns.some(pattern => pattern.test(message));
-}
-
-// New function to detect Twilio sandbox error messages
-function isTwilioSandboxError(message) {
-  const errorPatterns = [
-    /not connected to a sandbox/i,
-    /need to connect it first/i,
-    /sending.*join.*sandbox/i
-  ];
-  
-  return errorPatterns.some(pattern => pattern.test(message));
 }
 
 // Main webhook handler
@@ -248,14 +210,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { Body: rawBody, From: from, To: to } = req.body;
+    const { Body: rawBody, From: from } = req.body;
     
     if (!rawBody || !from) {
       return res.status(400).end('Missing required parameters');
     }
 
     const userPhone = from.replace('whatsapp:', '');
-    const message = sanitizeInput(rawBody);
+    const message = rawBody.trim();
 
     console.log(`[WEBHOOK] Received from ${userPhone}: ${message}`);
 
@@ -268,26 +230,12 @@ export default async function handler(req, res) {
       return res.status(200).send(twiml);
     }
 
-    // Get or create user
-    db.get('SELECT * FROM users WHERE phone = ?', [userPhone], (err, user) => {
-      if (err) {
-        console.error('Database error:', err);
-        return res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
-      }
+    const session = getUserSession(userPhone);
+    let responseMessage = '';
 
-      if (!user) {
-        db.run('INSERT INTO users (phone) VALUES (?)', [userPhone], function(err) {
-          if (err) console.error('Error creating user:', err);
-        });
-        user = { phone: userPhone, conversation_state: 'main_menu', sandbox_joined: 0 };
-      }
-
-      let responseMessage = '';
-      let newState = user.conversation_state;
-
-      // Handle sandbox join process
-      if (needsSandboxJoin(message)) {
-        responseMessage = `✅ *Great! You've joined the Fast Cab sandbox!*
+    // Handle sandbox join
+    if (message.toLowerCase().includes('join cap-pleasure') || message.toLowerCase().includes(`join ${SANDBOX_CODE}`)) {
+      responseMessage = `✅ *Great! You've joined the Fast Cab sandbox!*
 
 🎉 *Welcome to the demo!* You can now test our ride-hailing bot.
 
@@ -298,18 +246,14 @@ export default async function handler(req, res) {
 ⏱️ *Demo features:* Instant booking • 3 ride types • Full trip simulation
 
 *Ready to experience the future of ride-hailing?*`;
-        
-        // Mark user as sandbox joined
-        updateUserState(userPhone, 'main_menu', { sandbox_joined: 1 });
-        newState = 'main_menu';
-      }
       
-      // Handle main menu and greetings
-      else if (message.toLowerCase() === 'hi' || message.toLowerCase() === 'hello' || message.toLowerCase() === 'start') {
-        
-        // Check if user has joined sandbox
-        if (user.sandbox_joined === 0) {
-          responseMessage = `🚖 *Welcome to Fast Cab Demo!*
+      updateUserSession(userPhone, { sandbox_joined: true, conversation_state: 'main_menu' });
+    }
+    
+    // Handle greetings
+    else if (['hi', 'hello', 'start'].includes(message.toLowerCase())) {
+      if (!session.sandbox_joined) {
+        responseMessage = `🚖 *Welcome to Fast Cab Demo!*
 
 ⚠️ *First-time setup needed:*
 
@@ -323,8 +267,8 @@ export default async function handler(req, res) {
 🎯 *One-time setup* • Works for 72 hours • No app needed
 
 *Please send the join code above to continue...*`;
-        } else {
-          responseMessage = `🚖 *Welcome to Fast Cab Demo!*
+      } else {
+        responseMessage = `🚖 *Welcome to Fast Cab Demo!*
 
 🎭 *This is a live simulation* - Experience our ride-hailing bot!
 
@@ -338,15 +282,184 @@ export default async function handler(req, res) {
 👨‍✈️ *Professional drivers • Real-time updates*
 
 *What would you like to do?*`;
+        updateUserSession(userPhone, { conversation_state: 'main_menu' });
+      }
+    }
+    
+    // Handle ride requests
+    else if (session.sandbox_joined) {
+      const rideRequest = parseRideRequest(message);
+      
+      if (rideRequest) {
+        const { pickup, dropoff } = rideRequest;
+        
+        if (!validateLocation(pickup) || !validateLocation(dropoff)) {
+          responseMessage = `❌ *Location not recognized*
+
+📍 *Available Lagos areas:*
+• Ikoyi, Victoria Island (VI), Lekki
+• Surulere, Ikeja, Yaba, Lagos Island
+• Apapa, Ajah
+
+💬 *Try:* "ride from Ikoyi to VI"
+Or type *0* for main menu`;
+        } else {
+          const distance = calculateDistance(pickup, dropoff);
+          const pickupName = LAGOS_LOCATIONS[pickup.toLowerCase()].name;
+          const dropoffName = LAGOS_LOCATIONS[dropoff.toLowerCase()].name;
+          
+          updateUserSession(userPhone, {
+            conversation_state: 'selecting_ride',
+            booking_data: { pickup: pickupName, dropoff: dropoffName, distance }
+          });
+          
+          responseMessage = `🚗 *Available Demo Rides*
+📍 *From:* ${pickupName}
+📍 *To:* ${dropoffName}
+📏 *Distance:* ~${distance}km
+
+`;
+          
+          let optionNumber = 1;
+          Object.entries(RIDE_TYPES).forEach(([key, ride]) => {
+            const fare = calculateFare(key, distance);
+            
+            responseMessage += `*${optionNumber}. ${ride.name}*
+💰 ₦${fare.toLocaleString()}
+📝 ${ride.description}
+
+`;
+            optionNumber++;
+          });
+          
+          responseMessage += `💬 *Reply 1, 2, or 3 to select your ride*
+Or type *0* for main menu`;
         }
-        newState = 'main_menu';
       }
       
-      // Handle ride booking requests
+      // Handle ride selection
+      else if (session.conversation_state === 'selecting_ride' && ['1', '2', '3'].includes(message)) {
+        const rideTypes = Object.keys(RIDE_TYPES);
+        const selectedRideKey = rideTypes[parseInt(message) - 1];
+        const selectedRide = RIDE_TYPES[selectedRideKey];
+        
+        const { pickup, dropoff, distance } = session.booking_data;
+        const fare = calculateFare(selectedRideKey, distance);
+        const bookingId = generateBookingId();
+        const driver = DEMO_DRIVERS[Math.floor(Math.random() * DEMO_DRIVERS.length)];
+        
+        updateUserSession(userPhone, {
+          conversation_state: 'ride_confirmed',
+          booking_data: {
+            ...session.booking_data,
+            ride_type: selectedRideKey,
+            fare,
+            booking_id: bookingId,
+            driver
+          }
+        });
+        
+        responseMessage = `✅ *Demo Ride Confirmed!*
+${selectedRide.name} - ₦${fare.toLocaleString()}
+📍 *From:* ${pickup}
+📍 *To:* ${dropoff}
+
+👨‍✈️ *Your Demo Driver*
+📛 *${driver.name}*
+🚗 *${driver.vehicle_make} ${driver.vehicle_model}* (${driver.plate_number})
+⭐ ${driver.rating}/5 • ${driver.total_trips} trips
+📱 ${driver.phone}
+
+⏰ *Arriving in 8 seconds* *(demo speed)*
+
+🔔 *You'll be notified when driver arrives!*
+🎭 *This is a simulation - sit back and watch!*`;
+
+        // Schedule automated messages
+        await sendScheduledMessage(userPhone, 
+          `🚗 *Demo Driver Arrived!*
+${driver.name} is waiting for you
+📍 *Location:* ${pickup}
+🚗 *${driver.vehicle_make} ${driver.vehicle_model}* (${driver.plate_number})
+📱 ${driver.phone}
+
+⏰ *Please come out in 2 minutes*
+🎭 *Demo: Starting trip automatically...*`, 
+          DEMO_TIMINGS.DRIVER_ARRIVAL);
+
+        await sendScheduledMessage(userPhone,
+          `🚀 *Demo Trip Started!*
+📍 *Live tracking:* fast-cab-demo.vercel.app/track/${bookingId}
+⏱️ *ETA:* 15 seconds *(demo speed)*
+
+🛡️ *Safety features active*
+🎭 *Demo trip in progress...*`,
+          DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START);
+
+        await sendScheduledMessage(userPhone,
+          `🎉 *Demo Trip Completed!*
+💰 *Fare:* ₦${fare.toLocaleString()}
+⏱️ *Trip time:* 15 seconds
+📍 *Arrived at:* ${dropoff}
+
+⭐ *Rate your driver:* ${driver.name}
+Thank you for using Fast Cab Demo!
+
+🔄 *Try another ride?* 
+💬 Type "ride from [pickup] to [destination]"
+💬 Or say "Hi" for main menu`,
+          DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
+
+        await sendScheduledMessage(userPhone,
+          `🚖 *Ready for Another Demo Ride?*
+
+✨ *Try different routes:*
+💬 "ride from Lekki to Ikeja"
+💬 "ride from Surulere to Ajah"
+💬 "ride from Yaba to Apapa"
+
+🎯 *What did you think?*
+Share your feedback on this demo!
+
+💬 *Type your next ride request...*`,
+          DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION + DEMO_TIMINGS.AUTO_RESET);
+
+        // Reset user session after demo
+        setTimeout(() => {
+          updateUserSession(userPhone, { conversation_state: 'main_menu' });
+        }, DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION + DEMO_TIMINGS.AUTO_RESET);
+      }
+      
+      // Handle other commands
+      else if (['0', 'menu', 'main menu'].includes(message.toLowerCase())) {
+        responseMessage = `🚖 *Fast Cab Demo - Main Menu*
+
+💬 *Try these commands:*
+"ride from [pickup] to [destination]"
+
+📍 *Popular routes:*
+• "ride from Ikoyi to VI"
+• "ride from Lekki to Surulere"
+• "ride from Ikeja to Yaba"
+
+⚡ *Features:* Instant booking • 3 ride types • Upfront pricing`;
+        updateUserSession(userPhone, { conversation_state: 'main_menu' });
+      }
+      
       else {
-        // Check sandbox status first
-        if (user.sandbox_joined === 0) {
-          responseMessage = `🔒 *Sandbox Setup Required*
+        responseMessage = `❓ *Not sure what you mean*
+
+💬 *Try:*
+"ride from [pickup] to [destination]"
+
+📍 *Examples:*
+"ride from Ikoyi to VI"
+"ride from Lekki to Surulere"
+
+Or type *0* for main menu`;
+      }
+   } else {
+      responseMessage = `🔒 *Sandbox Setup Required*
 
 To use Fast Cab demo, please:
 
@@ -358,223 +471,17 @@ To use Fast Cab demo, please:
 *Step 3:* Say "Hi" to start demo
 
 🎯 *Quick one-time setup!*`;
-        } else {
-          const rideRequest = parseRideRequest(message);
-          
-          if (rideRequest) {
-            const { pickup, dropoff } = rideRequest;
-            
-            if (!validateLocation(pickup) || !validateLocation(dropoff)) {
-              responseMessage = `❌ *Location not recognized*
+    }
 
-📍 *Available Lagos areas:*
-• Ikoyi, Victoria Island (VI), Lekki
-• Surulere, Ikeja, Yaba, Lagos Island
-• Apapa, Ajah
-
-💬 *Try:* "ride from Ikoyi to VI"
-Or type *0* for main menu`;
-            } else {
-              // Process booking (same logic as before)
-              const distance = calculateDistance(pickup, dropoff);
-              const pickupName = LAGOS_LOCATIONS[pickup.toLowerCase()].name;
-              const dropoffName = LAGOS_LOCATIONS[dropoff.toLowerCase()].name;
-              const estimatedTime = Math.max(10, distance * 2.5);
-              
-              updateUserState(userPhone, 'selecting_ride', {
-                pickup_location: pickupName,
-                dropoff_location: dropoffName
-              });
-              
-              responseMessage = `🚗 *Available Demo Rides*
-📍 *From:* ${pickupName}
-📍 *To:* ${dropoffName}
-📏 *Distance:* ~${distance}km
-
-`;
-              
-              let optionNumber = 1;
-              Object.entries(RIDE_TYPES).forEach(([key, ride]) => {
-                const fare = calculateFare(key, distance);
-                const pickupTime = Math.floor(Math.random() * (ride.pickup_time_max - ride.pickup_time_min + 1)) + ride.pickup_time_min;
-                const tripTime = Math.round(estimatedTime);
-                
-                responseMessage += `*${optionNumber}. ${ride.name}*
-💰 ₦${fare.toLocaleString()}
-⏱️ ${pickupTime}s pickup • ${tripTime}s trip *(demo speed)*
-📝 ${ride.description}
-
-`;
-                optionNumber++;
-              });
-              
-              responseMessage += `💬 *Reply 1, 2, or 3 to select your ride*
-Or type *0* for main menu`;
-              newState = 'selecting_ride';
-            }
-          }
-          
-          // Handle ride selection
-          else if (user.conversation_state === 'selecting_ride' && ['1', '2', '3'].includes(message)) {
-            const rideTypes = Object.keys(RIDE_TYPES);
-            const selectedRideKey = rideTypes[parseInt(message) - 1];
-            const selectedRide = RIDE_TYPES[selectedRideKey];
-            
-            const distance = calculateDistance(user.pickup_location, user.dropoff_location);
-            const fare = calculateFare(selectedRideKey, distance);
-            const bookingId = generateBookingId();
-            
-            db.get('SELECT * FROM drivers WHERE is_available = 1 ORDER BY RANDOM() LIMIT 1', (err, driver) => {
-              if (err || !driver) {
-                console.error('Error selecting driver:', err);
-                return;
-              }
-              
-              db.run(`INSERT INTO bookings (id, user_phone, pickup_location, dropoff_location, ride_type, fare, driver_id) 
-                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [bookingId, userPhone, user.pickup_location, user.dropoff_location, selectedRideKey, fare, driver.id]);
-              
-              updateUserState(userPhone, 'ride_confirmed', {
-                booking_id: bookingId,
-                driver_id: driver.id,
-                selected_ride_type: selectedRideKey
-              });
-              
-              const pickupTime = Math.floor(Math.random() * (selectedRide.pickup_time_max - selectedRide.pickup_time_min + 1)) + selectedRide.pickup_time_min;
-              
-              responseMessage = `✅ *Demo Ride Confirmed!*
-${selectedRide.name} - ₦${fare.toLocaleString()}
-📍 *From:* ${user.pickup_location}
-📍 *To:* ${user.dropoff_location}
-
-👨‍✈️ *Your Demo Driver*
-📛 *${driver.name}*
-🚗 *${driver.vehicle_make} ${driver.vehicle_model}* (${driver.plate_number})
-⭐ ${driver.rating}/5 • ${driver.total_trips} trips
-📱 ${driver.phone}
-
-⏰ *Arriving in ${pickupTime} seconds* *(demo speed)*
-
-🔔 *You'll be notified when driver arrives!*
-🎭 *This is a simulation - sit back and watch!*`;
-
-              // Schedule all automated messages
-              scheduleAutomatedMessage(userPhone, 
-                `🚗 *Demo Driver Arrived!*
-${driver.name} is waiting for you
-📍 *Location:* ${user.pickup_location}
-🚗 *${driver.vehicle_make} ${driver.vehicle_model}* (${driver.plate_number})
-📱 ${driver.phone}
-
-⏰ *Please come out in 2 minutes*
-🎭 *Demo: Starting trip automatically...*`, 
-                DEMO_TIMINGS.DRIVER_ARRIVAL, 'driver_arrived');
-
-              scheduleAutomatedMessage(userPhone,
-                `🚀 *Demo Trip Started!*
-📍 *Live tracking:* https://fast-cab-website.vercel.app/track/${bookingId}
-⏱️ *ETA:* 15 seconds *(demo speed)*
-
-🛡️ *Safety features active*
-🎭 *Demo trip in progress...*`,
-                DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START, 'trip_started');
-
-              scheduleAutomatedMessage(userPhone,
-                `🎉 *Demo Trip Completed!*
-💰 *Fare:* ₦${fare.toLocaleString()}
-⏱️ *Trip time:* 15 seconds
-📍 *Arrived at:* ${user.dropoff_location}
-
-⭐ *Rate your driver:* ${driver.name}
-Thank you for using Fast Cab Demo!
-
-🔄 *Try another ride?* 
-💬 Type "ride from [pickup] to [destination]"
-💬 Or type "book" for quick booking`,
-                DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION, 'trip_completed');
-
-              scheduleAutomatedMessage(userPhone,
-                `🚖 *Ready for Another Demo Ride?*
-
-✨ *Try different routes:*
-💬 "ride from Lekki to Ikeja"
-💬 "ride from Surulere to Ajah"
-💬 "ride from Yaba to Apapa"
-
-🎯 *What did you think?*
-Share your feedback on this demo!
-
-💬 *Type your next ride request...*`,
-                DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION + DEMO_TIMINGS.AUTO_RESET, 'main_menu');
-            });
-          }
-          
-          // Handle other commands
-          else if (message === '0' || message.toLowerCase() === 'menu' || message.toLowerCase() === 'main menu') {
-            responseMessage = `🚖 *Fast Cab Demo - Main Menu*
-
-💬 *Try these commands:*
-"ride from [pickup] to [destination]"
-
-📍 *Popular routes:*
-• "ride from Ikoyi to VI"
-• "ride from Lekki to Surulere"
-• "ride from Ikeja to Yaba"
-
-⚡ *Features:* Instant booking • 3 ride types • Upfront pricing`;
-            newState = 'main_menu';
-          }
-          
-          else if (message.toLowerCase().includes('book') || message.toLowerCase().includes('another ride')) {
-            responseMessage = `🚗 *Quick Booking*
-
-💬 *Format:* "ride from [pickup] to [destination]"
-
-📍 *Example:*
-"ride from Ikoyi to Victoria Island"
-"ride from Lekki to Surulere"
-"ride from Ikeja to Yaba"
-
-*What's your route?*`;
-            newState = 'main_menu';
-          }
-          
-          // Default fallback
-          else {
-            responseMessage = `❓ *Not sure what you mean*
-
-💬 *Try:*
-"ride from [pickup] to [destination]"
-
-📍 *Examples:*
-"ride from Ikoyi to VI"
-"ride from Lekki to Surulere"
-
-Or type *0* for main menu`;
-          }
-        }
-      }
-
-      // Send response
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    // Always send TwiML response to Twilio
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>${responseMessage}</Message>
 </Response>`;
-
-      // Update user state if changed
-      if (newState !== user.conversation_state) {
-        updateUserState(userPhone, newState);
-      }
-
-      res.status(200).send(twiml);
-    });
+    return res.status(200).send(twiml);
 
   } catch (error) {
-    console.error('Webhook error:', error);
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>🚖 Fast Cab Demo temporarily unavailable. Please try again in a moment!</Message>
-</Response>`;
-    res.status(200).send(twiml);
+    console.error(error);
+    return res.status(500).end('Internal Server Error');
   }
 }
