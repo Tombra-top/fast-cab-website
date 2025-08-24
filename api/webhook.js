@@ -485,3 +485,26 @@ To use Fast Cab demo, please:
 
 🎯 *Quick one-time setup!*`;
     }
+    // ...existing code...
+    }
+    // Add this block to send TwiML response to Twilio
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responseMessage}</Message>
+</Response>`;
+    return res.status(200).send(twiml);
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).end('Internal Server Error');
+  }
+// ...existing code...
+// ...existing code...
+    }
+    // <-- End of try block
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).end('Internal Server Error');
+  }
+// ...existing code...
