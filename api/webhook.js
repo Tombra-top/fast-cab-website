@@ -287,28 +287,32 @@ export default async function handler(req, res) {
         joinedAt: Date.now() 
       });
       
-      responseMessage = `✅ *Welcome to Fast Cab Demo!*
+      responseMessage = `✅ *You're all set! Welcome to Fast Cab*
 
-🎉 *You're now connected!* 
+🚖 *Book your first ride in 3 easy steps:*
 
-🚖 *Ready to book your first ride?*
+*Step 1:* Pick a route below (just copy & send)
+*Step 2:* Choose Economy, Comfort, or Premium  
+*Step 3:* Watch your live ride demo!
 
-🔥 *Try these popular routes:*
-${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
+🔥 *Popular routes:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+💬 ride from VI to Lekki
 
-📍 *Available areas:*
-Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
-
-*Where would you like to go?*`;
+*Just copy any route above and send it!* ⬆️`;
     }
 
-    // PRIORITY 2: Handle greetings (hi, hello, start)
-    else if (['hi', 'hello', 'start', 'hey', 'menu'].includes(message.toLowerCase().trim())) {
+    // PRIORITY 2: Handle greetings and website demo clicks
+    else if (
+      ['hi', 'hello', 'start', 'hey', 'menu'].includes(message.toLowerCase().trim()) ||
+      message.toLowerCase().includes('hi! i want to try the fast cab demo')
+    ) {
       const session = global.userSessions.get(userPhone);
       const isConnected = session?.connected || await checkSandboxStatus(userPhone);
       
       if (isConnected) {
-        console.log('👋 RETURNING USER - Direct to menu');
+        console.log('👋 RETURNING USER - Direct to welcome menu');
         
         // Update session if not already marked
         if (!session?.connected) {
@@ -318,36 +322,39 @@ Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
           });
         }
         
-        responseMessage = `🚖 *Welcome back to Fast Cab!*
+        responseMessage = `🚖 *Welcome to Fast Cab!*
 
-🔥 *Popular routes - just copy & send:*
-${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
+*Book a ride in 30 seconds:*
 
-📍 *Or create your own:*
-💬 "ride from [pickup] to [destination]"
+*Step 1:* Copy any route below  
+*Step 2:* Choose your ride type (1, 2, or 3)
+*Step 3:* Experience the full demo!
 
-⚡ *Available areas:*
-Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja  
+💬 ride from VI to Lekki
 
-*Where would you like to go today?*`;
+*Copy & send any route above* ⬆️`;
       } else {
-        console.log('🆕 NEW USER - Show setup');
+        console.log('🆕 NEW USER - From website, show setup');
         
         responseMessage = `🚖 *Welcome to Fast Cab Demo!*
 
-⚠️ *Quick setup needed:*
+👋 *Thanks for clicking "Try Live Demo"!*
 
-*Step 1:* Copy this code:
+⚠️ *Quick one-time setup needed:*
+
+**Step 1:** Copy this exact code:
 \`join cap-pleasure\`
 
-*Step 2:* Send it in this chat
+**Step 2:** Send it in this chat
 
-*Step 3:* Say "hi" again to start booking!
+**Step 3:** Start booking rides immediately!
 
-🎯 *One-time setup • Takes 10 seconds*
-⚡ *No app download needed*
+🎯 *Takes 10 seconds • Works for 3 days*
+⚡ *No app download required*
 
-*Send the join code to continue...*`;
+*Copy & send the join code above to continue...*`;
       }
     }
 
