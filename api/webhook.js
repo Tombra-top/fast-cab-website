@@ -455,36 +455,106 @@ export default async function handler(req, res) {
 📱 *Live updates coming...*`;
       }
       
-      // Handle payment selection
-      else if (msg === 'cash') {
-        responseMessage = `💰 *Cash payment selected*
+      // Handle rating (1-5 stars)
+      else if (['1', '2', '3', '4', '5'].includes(msg) && msg.length === 1) {
+        const session = global.userSessions.get(userPhone);
+        if (session?.activeTrip) {
+          const rating = parseInt(msg);
+          const { driver, fare } = session.activeTrip;
+          
+          let ratingText = '';
+          let ratingEmoji = '';
+          
+          switch(rating) {
+            case 1: ratingText = 'Poor'; ratingEmoji = '⭐'; break;
+            case 2: ratingText = 'Fair'; ratingEmoji = '⭐⭐'; break;
+            case 3: ratingText = 'Good'; ratingEmoji = '⭐⭐⭐'; break;
+            case 4: ratingText = 'Very Good'; ratingEmoji = '⭐⭐⭐⭐'; break;
+            case 5: ratingText = 'Excellent'; ratingEmoji = '⭐⭐⭐⭐⭐'; break;
+          }
+          
+          responseMessage = `✅ *Rating submitted!*
 
-✅ *Pay your driver directly*
-💵 *Have exact change ready*
+${ratingEmoji} *${rating}/5 - ${ratingText}*
+👨‍✈️ *${driver.name}* has been rated
 
-*Payment confirmed!*
+${rating >= 4 ? '🎉 Thank you for the positive feedback!' : '📝 Your feedback helps us improve!'}
 
-🚖 *Book another ride?*
+💳 *Payment method:*
+💬 Type "cash" or "transfer"
+
+*Choose your payment option above*`;
+        } else {
+          responseMessage = `❓ *No completed trip to rate*
+
+*Start a new ride:*
 💬 ride from Ikoyi to VI
 💬 ride from Lekki to Ikeja
 
 *Copy any route above!*`;
+        }
+      }
+      
+      // Handle payment selection  
+      else if (msg === 'cash') {
+        const session = global.userSessions.get(userPhone);
+        if (session?.activeTrip) {
+          // Clear the trip after payment
+          global.userSessions.set(userPhone, { connected: true });
+          
+          responseMessage = `💰 *Cash payment selected*
+
+✅ *Pay your driver directly*
+💵 *Have exact change ready*
+
+*Payment completed successfully!*
+
+🚖 *Book another ride?*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+💬 ride from VI to Yaba
+
+*Copy any route above!*`;
+        } else {
+          responseMessage = `❓ *No trip to pay for*
+
+*Start a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+        }
       }
       
       else if (msg === 'transfer') {
-        responseMessage = `💳 *Bank transfer selected*
+        const session = global.userSessions.get(userPhone);
+        if (session?.activeTrip) {
+          // Clear the trip after payment
+          global.userSessions.set(userPhone, { connected: true });
+          
+          responseMessage = `💳 *Bank transfer selected*
 
 ✅ *Payment link sent to ${userPhone.slice(-4)}***
 🏦 *Transfer to: Fast Cab Account*
 💰 *Amount will be auto-deducted*
 
-*Payment confirmed!*
+*Payment completed successfully!*
 
 🚖 *Book another ride?*
 💬 ride from Ikoyi to VI
 💬 ride from Lekki to Ikeja
+💬 ride from VI to Yaba
 
 *Copy any route above!*`;
+        } else {
+          responseMessage = `❓ *No trip to pay for*
+
+*Start a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+        }
       }
       
       // Handle ride booking
@@ -519,8 +589,8 @@ export default async function handler(req, res) {
 *Reply 1, 2, or 3 to book now!*`;
       }
       
-      // PRIORITY 4: Handle ride selection (1, 2, 3)
-      else if (['1', '2', '3'].includes(message.trim())) {
+      // PRIORITY 4: Handle ride selection (1, 2, 3) - but not ratings (1-5)
+      else if (['1', '2', '3'].includes(message.trim()) && message.trim().length === 1) {
         const session = global.userSessions.get(userPhone);
         
         if (!session?.pendingRide) {
@@ -607,17 +677,10 @@ ${driver.name} is waiting outside
 📍 *Arrived at:* ${pendingRide.dropoffName}
 ⏱️ *Trip time:* 15 seconds
 
-⭐ *Rate ${driver.name}:* Excellent! ⭐⭐⭐⭐⭐
+⭐ *Rate ${driver.name}:*
+💬 Type "1" (Poor) to "5" (Excellent)
 
-💳 *Payment method:*
-💬 Type "cash" or "transfer"
-
-🚖 *Book another ride?*
-💬 ride from Ikoyi to VI
-💬 ride from Lekki to Ikeja
-💬 ride from VI to Yaba
-
-*Copy any route above!*`,
+*How was your ride experience?*`,
             DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
         }
       }
