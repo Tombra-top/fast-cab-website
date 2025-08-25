@@ -293,7 +293,7 @@ export default async function handler(req, res) {
 
 *Step 1:* Pick a route below (just copy & send)
 *Step 2:* Choose Economy, Comfort, or Premium  
-*Step 3:* Watch your live ride demo!
+*Step 3:* Enjoy your ride!
 
 🔥 *Popular routes:*
 💬 ride from Ikoyi to VI
@@ -328,7 +328,7 @@ export default async function handler(req, res) {
 
 *Step 1:* Copy any route below  
 *Step 2:* Choose your ride type (1, 2, or 3)
-*Step 3:* Experience the full demo!
+*Step 3:* Enjoy your ride!
 
 💬 ride from Ikoyi to VI
 💬 ride from Lekki to Ikeja  
@@ -338,31 +338,157 @@ export default async function handler(req, res) {
       } else {
         console.log('🆕 NEW USER - From website, show setup');
         
-        responseMessage = `🚖 *Welcome to Fast Cab Demo!*
+        responseMessage = `🚖 *Welcome! Let's get you a ride*
 
-👋 *Thanks for clicking "Try Live Demo"!*
+*Quick setup (takes 10 seconds):*
 
-⚠️ *Quick one-time setup needed:*
-
-**Step 1:** Copy this exact code:
+**Copy this code:**
 \`join cap-pleasure\`
 
-**Step 2:** Send it in this chat
+**Send it here, then book rides like:**
+💬 "ride from Ikoyi to VI"
+💬 "ride from Lekki to Ikeja"
 
-**Step 3:** Start booking rides immediately!
+✅ Book rides instantly
+✅ Try 3 different car types  
+✅ See live ride tracking
 
-🎯 *Takes 10 seconds • Works for 3 days*
-⚡ *No app download required*
-
-*Copy & send the join code above to continue...*`;
+*Copy & send the code above* ⬆️`;
       }
     }
 
-    // PRIORITY 3: Handle ride booking requests
+    // PRIORITY 3: Handle ride booking requests, tracking, cancellation, and payment
     else {
       const rideRequest = parseRideRequest(message);
+      const msg = message.toLowerCase().trim();
       
-      if (rideRequest) {
+      // Handle trip tracking
+      if (msg === 'track') {
+        const session = global.userSessions.get(userPhone);
+        if (session?.activeTrip) {
+          const { driver, pickup, dropoff, bookingId } = session.activeTrip;
+          responseMessage = `🔍 *Live Tracking*
+
+📍 *Booking:* ${bookingId}
+🚗 *Driver:* ${driver.name}
+📱 *Phone:* ${driver.phone}
+🏷️ *Plate:* ${driver.plate}
+
+📍 *Route:* ${pickup} → ${dropoff}
+🌐 *Full tracking:* fast-cab.vercel.app/track/${bookingId}
+
+*Your ride is in progress...*`;
+        } else {
+          responseMessage = `❌ *No active trip to track*
+
+*Start a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+        }
+      }
+      
+      // Handle trip cancellation
+      else if (msg === 'cancel') {
+        const session = global.userSessions.get(userPhone);
+        if (session?.activeTrip) {
+          responseMessage = `❌ *Cancel your trip?*
+
+🚗 *Current booking:* ${session.activeTrip.bookingId}
+📍 ${session.activeTrip.pickup} → ${session.activeTrip.dropoff}
+🚗 *Driver:* ${session.activeTrip.driver.name}
+
+*Are you sure you want to cancel?*
+
+💬 Type "yes" to cancel
+💬 Type "no" to continue trip`;
+        } else {
+          responseMessage = `❌ *No active trip to cancel*
+
+*Start a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+        }
+      }
+      
+      // Handle cancellation confirmation
+      else if (msg === 'yes') {
+        const session = global.userSessions.get(userPhone);
+        if (session?.activeTrip) {
+          const { bookingId, driver } = session.activeTrip;
+          // Clear active trip
+          global.userSessions.set(userPhone, { connected: true });
+          
+          responseMessage = `✅ *Trip cancelled successfully*
+
+📍 *Booking ${bookingId}* has been cancelled
+🚗 *${driver.name}* has been notified
+
+💰 *No charges applied*
+
+*Book a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+💬 ride from VI to Yaba
+
+*Copy any route above!*`;
+        } else {
+          responseMessage = `❓ *No trip to cancel*
+
+*Start a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+        }
+      }
+      
+      // Handle cancellation decline
+      else if (msg === 'no') {
+        responseMessage = `✅ *Trip continues*
+
+🚗 *Your ride is still active*
+🔍 *Track:* Type "track" anytime
+📱 *Live updates coming...*`;
+      }
+      
+      // Handle payment selection
+      else if (msg === 'cash') {
+        responseMessage = `💰 *Cash payment selected*
+
+✅ *Pay your driver directly*
+💵 *Have exact change ready*
+
+*Payment confirmed!*
+
+🚖 *Book another ride?*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+      }
+      
+      else if (msg === 'transfer') {
+        responseMessage = `💳 *Bank transfer selected*
+
+✅ *Payment link sent to ${userPhone.slice(-4)}***
+🏦 *Transfer to: Fast Cab Account*
+💰 *Amount will be auto-deducted*
+
+*Payment confirmed!*
+
+🚖 *Book another ride?*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+
+*Copy any route above!*`;
+      }
+      
+      // Handle ride booking
+      else if (rideRequest) {
         console.log(`🚗 RIDE REQUEST: ${rideRequest.pickup} → ${rideRequest.dropoff}`);
         
         const { pickup, dropoff } = rideRequest;
@@ -377,24 +503,20 @@ export default async function handler(req, res) {
           lastActivity: Date.now()
         });
         
-        responseMessage = `🚗 *Choose Your Ride*
+        responseMessage = `🚗 *Pick your ride:*
 
-📍 *${pickupName}* → *${dropoffName}*
-📏 *Distance:* ~${distance}km
+📍 *${pickupName}* → *${dropoffName}* (~${distance}km)
 
-`;
-        
-        let optionNumber = 1;
-        Object.entries(RIDE_TYPES).forEach(([key, ride]) => {
-          const fare = calculateFare(key, distance);
-          responseMessage += `*${optionNumber}. ${ride.name}*
-💰 ₦${fare.toLocaleString()} • ${ride.description}
+*1.* 🚗 Economy - ₦${calculateFare('economy', distance).toLocaleString()} 
+*Budget-friendly • 2-4 mins*
 
-`;
-          optionNumber++;
-        });
-        
-        responseMessage += `*Reply 1, 2, or 3 to book instantly! 🚀*`;
+*2.* 🚙 Comfort - ₦${calculateFare('comfort', distance).toLocaleString()}
+*More space • AC guaranteed*
+
+*3.* 🚕 Premium - ₦${calculateFare('premium', distance).toLocaleString()}
+*Luxury • Top drivers*
+
+*Reply 1, 2, or 3 to book now!*`;
       }
       
       // PRIORITY 4: Handle ride selection (1, 2, 3)
@@ -404,10 +526,12 @@ export default async function handler(req, res) {
         if (!session?.pendingRide) {
           responseMessage = `⚠️ *No pending booking*
 
-🚖 *Start a new booking:*
-${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
+*Start a new ride:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja  
+💬 ride from VI to Yaba
 
-*What's your pickup and destination?*`;
+*Copy any route above!*`;
         } else {
           console.log(`🎯 RIDE SELECTION: Option ${message}`);
           
@@ -424,57 +548,76 @@ ${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
           // Clear pending ride
           global.userSessions.set(userPhone, { connected: true });
           
-          responseMessage = `✅ *Ride Confirmed!*
+          responseMessage = `✅ *Ride booked successfully!*
 
 ${selectedRide.name} - ₦${fare.toLocaleString()}
 📍 ${pendingRide.pickupName} → ${pendingRide.dropoffName}
 
-👨‍✈️ *Your Driver*
-📱 *${driver.name}*
-🚗 *${driver.vehicle}*
-🏷️ *${driver.plate}*
-⭐ *${driver.rating}/5* (${driver.trips} trips)
+🚗 *Your driver: ${driver.name}*
+📱 ${driver.phone}
+🚗 ${driver.vehicle} (${driver.plate})
+⭐ ${driver.rating}/5 rating
 
-📍 *Booking:* ${bookingId}
+📍 *Booking ID:* ${bookingId}
 ⏰ *Arriving in 8 seconds...*
 
-🎭 *Demo starting now!*`;
+🔍 *Track driver:* Type "track" anytime
+❌ *Cancel trip:* Type "cancel" if needed
 
-          // Automated demo sequence
+*Your ride is on the way!*`;
+
+          // Store active trip for tracking and cancellation
+          global.userSessions.set(userPhone, {
+            connected: true,
+            activeTrip: {
+              bookingId,
+              driver,
+              pickup: pendingRide.pickupName,
+              dropoff: pendingRide.dropoffName,
+              fare,
+              startTime: Date.now()
+            }
+          });
+
+          // Automated ride sequence
           await sendScheduledMessage(userPhone, 
-            `🚗 *Driver Arrived!*
+            `🚗 *Driver arrived!*
 
 ${driver.name} is waiting outside
-📍 *Pickup:* ${pendingRide.pickupName}
-🚗 *Vehicle:* ${driver.vehicle} (${driver.plate})
+📍 ${pendingRide.pickupName}
+🚗 ${driver.vehicle} (${driver.plate})
 
-⏰ *Trip starting in 5 seconds...*`, 
+*Getting in now...*`, 
             DEMO_TIMINGS.DRIVER_ARRIVAL);
 
           await sendScheduledMessage(userPhone,
-            `🚀 *Trip Started!*
+            `🚀 *Trip started!*
 
-📱 *Live tracking:* fast-cab.vercel.app/track/${bookingId}
-⏱️ *ETA:* 15 seconds (demo mode)
-📍 *Destination:* ${pendingRide.dropoffName}
+📱 *Track live:* fast-cab.vercel.app/track/${bookingId}
+⏱️ *ETA:* 15 seconds  
+📍 *Going to:* ${pendingRide.dropoffName}
 
-🛡️ *Enjoy your safe ride!*`,
+*Enjoying the smooth ride...*`,
             DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START);
 
           await sendScheduledMessage(userPhone,
-            `🎉 *Trip Completed!*
+            `🎉 *Trip completed successfully!*
 
 💰 *Total:* ₦${fare.toLocaleString()}
-📍 *Arrived:* ${pendingRide.dropoffName}
-⏱️ *Duration:* 15 seconds
-⭐ *Rate ${driver.name}:* ⭐⭐⭐⭐⭐
+📍 *Arrived at:* ${pendingRide.dropoffName}
+⏱️ *Trip time:* 15 seconds
 
-🎭 *Demo complete!*
+⭐ *Rate ${driver.name}:* Excellent! ⭐⭐⭐⭐⭐
 
-🔥 *Book another ride?*
-${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
+💳 *Payment method:*
+💬 Type "cash" or "transfer"
 
-*Ready for your next ride?*`,
+🚖 *Book another ride?*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+💬 ride from VI to Yaba
+
+*Copy any route above!*`,
             DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
         }
       }
@@ -483,17 +626,17 @@ ${POPULAR_ROUTES.map(route => `💬 "${route}"`).join('\n')}
       else {
         console.log(`❓ UNRECOGNIZED: "${message}"`);
         
-        responseMessage = `❓ *Not quite sure what you mean*
+        responseMessage = `❓ *Try this instead:*
 
-🚗 *To book a ride, try:*
-${POPULAR_ROUTES.slice(0, 3).map(route => `💬 "${route}"`).join('\n')}
+*Copy & send any of these:*
+💬 ride from Ikoyi to VI
+💬 ride from Lekki to Ikeja
+💬 ride from VI to Yaba
 
-📍 *Available locations:*
-Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
+*Or say:*
+💬 "ride from [pickup] to [destination]"
 
-💡 *Tip:* Say "ride from [pickup] to [destination]"
-
-*Where would you like to go?*`;
+*Available areas:* Ikoyi, VI, Lekki, Ikeja, Surulere, Yaba`;
       }
     }
 
