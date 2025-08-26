@@ -1,4 +1,4 @@
-// Fast Cab WhatsApp Webhook - Performance Optimized & Feature Complete
+// Fast Cab WhatsApp Webhook - SESSION BUGS FIXED
 // Handles ride booking, tracking, cancellation, optional rating, and payment
 
 // Configuration
@@ -17,7 +17,7 @@ if (!global.requestCounts) {
   global.requestCounts = new Map();
 }
 
-// Lagos locations with aliases (from previous working version)
+// Lagos locations with aliases
 const LAGOS_LOCATIONS = {
   'ikoyi': { name: 'Ikoyi', lat: 6.4511, lng: 3.4372 },
   'vi': { name: 'Victoria Island', lat: 6.4281, lng: 3.4219 },
@@ -54,7 +54,7 @@ const RIDE_TYPES = {
   }
 };
 
-// Demo drivers (from previous working version)
+// Demo drivers
 const DEMO_DRIVERS = [
   {
     name: 'Emeka Johnson',
@@ -84,9 +84,9 @@ const DEMO_DRIVERS = [
 
 // HELPER FUNCTIONS
 
-// Detect sandbox join messages
+// Detect sandbox join messages - MORE FLEXIBLE MATCHING
 function isSandboxJoinMessage(message) {
-  const msg = message.toLowerCase().replace(/\s/g, '');
+  const msg = message.toLowerCase().replace(/\s+/g, '');
   const patterns = [
     'joincap-pleasure',
     'joincappleasure', 
@@ -96,13 +96,15 @@ function isSandboxJoinMessage(message) {
   return patterns.some(pattern => msg.includes(pattern));
 }
 
-// Parse ride requests with smart location matching
+// Parse ride requests with smart location matching - IMPROVED
 function parseRideRequest(message) {
   const msg = message.toLowerCase().trim();
   
+  // Enhanced patterns to catch more variations
   const patterns = [
     /(?:ride|book|trip|go)?\s*from\s+([^to]+?)\s+to\s+(.+)/i,
-    /([a-zA-Z\s]+)\s+to\s+([a-zA-Z\s]+)/i
+    /([a-zA-Z\s]+)\s+to\s+([a-zA-Z\s]+)/i,
+    /^([a-zA-Z\s]+)-([a-zA-Z\s]+)$/i // handles "lekki-ikeja" format
   ];
   
   for (const pattern of patterns) {
@@ -119,24 +121,26 @@ function parseRideRequest(message) {
   return null;
 }
 
-// Smart location finder with fuzzy matching
+// Smart location finder with fuzzy matching - ENHANCED
 function findLocation(input) {
   const term = input.toLowerCase().trim();
   
   // Direct match
   if (LAGOS_LOCATIONS[term]) return term;
   
-  // Abbreviations
-  const abbrev = {
+  // Abbreviations and aliases
+  const aliases = {
     'vi': 'victoria island',
     'v.i': 'victoria island', 
-    'v.i.': 'victoria island'
+    'v.i.': 'victoria island',
+    'island': 'lagos island'
   };
-  if (abbrev[term]) return abbrev[term];
+  if (aliases[term]) return aliases[term];
   
-  // Partial match
+  // Partial match (more flexible)
   const matches = Object.keys(LAGOS_LOCATIONS).filter(loc => 
-    loc.includes(term) || term.includes(loc)
+    loc.includes(term) || term.includes(loc) || 
+    LAGOS_LOCATIONS[loc].name.toLowerCase().includes(term)
   );
   
   return matches.length === 1 ? matches[0] : null;
@@ -185,23 +189,22 @@ function generateBookingId() {
   return 'FC' + Date.now().toString(36).substr(-6).toUpperCase();
 }
 
-// Fast non-blocking message sending (PERFORMANCE OPTIMIZATION)
-function sendMessage(to, message) {
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+// Fast TwiML response
+function createTwiMLResponse(message) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>${message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
 </Response>`;
-  return twiml;
 }
 
-// Send scheduled messages using Twilio API
+// Send scheduled messages using Twilio API (non-blocking)
 async function sendScheduledMessage(userPhone, message, delay) {
-  if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-    console.log(`[SCHEDULED MESSAGE - Dev Mode]: ${message.substring(0, 50)}...`);
-    return;
-  }
-  
   setTimeout(async () => {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      console.log(`[SCHEDULED - Dev Mode]: ${message.substring(0, 50)}...`);
+      return;
+    }
+    
     try {
       const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`, {
         method: 'POST',
@@ -225,14 +228,6 @@ async function sendScheduledMessage(userPhone, message, delay) {
   }, delay);
 }
 
-// Check sandbox status (auto-detect for multiple users)
-async function checkSandboxStatus(userPhone) {
-  // For WhatsApp Business API sandbox, users are connected if they can send messages
-  // In production, check if user has completed sandbox join process
-  const session = global.userSessions.get(userPhone);
-  return session?.connected || false;
-}
-
 // MAIN WEBHOOK HANDLER
 export default async function handler(req, res) {
   // Performance: Set headers immediately
@@ -240,14 +235,14 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   
   if (req.method !== 'POST') {
-    return res.status(405).send(sendMessage('', 'Method not allowed'));
+    return res.status(405).send(createTwiMLResponse('Method not allowed'));
   }
 
   try {
     const { Body: rawBody, From: from } = req.body;
     
     if (!rawBody || !from) {
-      return res.status(400).send(sendMessage('', 'Invalid request'));
+      return res.status(400).send(createTwiMLResponse('Invalid request'));
     }
 
     const userPhone = from.replace('whatsapp:', '');
@@ -257,26 +252,31 @@ export default async function handler(req, res) {
 
     // Rate limiting
     if (!checkRateLimit(userPhone)) {
-      return res.status(429).send(sendMessage('', '⏳ Too many requests. Please wait a moment.'));
+      return res.status(429).send(createTwiMLResponse('⏳ Too many requests. Please wait a moment.'));
+    }
+
+    // Get or create user session - FIXED INITIALIZATION
+    let session = global.userSessions.get(userPhone);
+    if (!session) {
+      session = { 
+        connected: false,
+        currentState: 'new_user',
+        joinedAt: null
+      };
+      global.userSessions.set(userPhone, session);
+      console.log(`🆕 NEW SESSION created for ${userPhone.slice(-4)}`);
     }
 
     let responseMessage = '';
     
-    // Get user session - fix session initialization
-    let session = global.userSessions.get(userPhone) || { 
-      connected: false,
-      currentState: 'new_user'
-    };
-
     // PRIORITY 1: Handle sandbox join (new user setup)
     if (isSandboxJoinMessage(message)) {
-      console.log('✅ SANDBOX JOIN - New user connecting');
+      console.log(`✅ SANDBOX JOIN detected for ${userPhone.slice(-4)}`);
       
-      session = { 
-        connected: true, 
-        joinedAt: Date.now(),
-        currentState: 'welcome'
-      };
+      // Mark user as connected
+      session.connected = true;
+      session.joinedAt = Date.now();
+      session.currentState = 'welcome';
       global.userSessions.set(userPhone, session);
       
       responseMessage = `✅ *Connected successfully!*
@@ -291,22 +291,19 @@ export default async function handler(req, res) {
 *Ready to book your ride?*`;
     }
 
-    // PRIORITY 2: Handle greetings and demo messages
+    // PRIORITY 2: Handle greetings from connected users
     else if (
-      ['hi', 'hello', 'start', 'hey', 'menu'].includes(message.toLowerCase().trim()) ||
-      message.toLowerCase().includes('hi! i want to try the fast cab demo')
+      session.connected && (
+        ['hi', 'hello', 'start', 'hey', 'menu'].includes(message.toLowerCase().trim()) ||
+        message.toLowerCase().includes('hi! i want to try the fast cab demo')
+      )
     ) {
-      const isConnected = session.connected || await checkSandboxStatus(userPhone);
+      console.log(`👋 WELCOME MESSAGE for connected user ${userPhone.slice(-4)}`);
       
-      if (isConnected) {
-        console.log('👋 RETURNING USER - Direct to welcome menu');
-        
-        // Ensure session is properly set for returning users
-        session.connected = true;
-        session.currentState = 'welcome';
-        global.userSessions.set(userPhone, session);
-        
-        responseMessage = `🚖 *Welcome back to Fast Cab!*
+      session.currentState = 'welcome';
+      global.userSessions.set(userPhone, session);
+      
+      responseMessage = `🚖 *Welcome back to Fast Cab!*
 
 🔥 *Popular routes (copy & send):*
 💬 "ride from Ikoyi to VI"
@@ -314,61 +311,28 @@ export default async function handler(req, res) {
 💬 "ride from Surulere to Yaba"
 
 *Ready to book your ride?*`;
-      } else {
-        console.log('🆕 NEW USER - Show setup');
-        
-        responseMessage = `🚖 *Welcome to Fast Cab!*
-👋 *Thanks for trying our service!*
-
-⚠️ *Quick setup needed:*
-
-📋 *Step 1:* Copy this code:
-join cap-pleasure
-
-📋 *Step 2:* Send it here
-
-📋 *Step 3:* Book rides like:
-💬 "ride from Ikoyi to VI"  
-💬 "ride from Lekki to Ikeja"
-
-⚡ *Takes 10 seconds • No app needed*
-
-*Copy & send the join code above to start!*`;
-      }
     }
 
-    // PRIORITY 3: Handle authenticated user interactions
+    // PRIORITY 3: Handle ride requests from connected users - MAIN FIX
     else if (session.connected) {
       const msg = message.toLowerCase().trim();
       
-      // Handle ride booking requests - FIXED parsing logic
+      // Handle ride booking requests
       const rideRequest = parseRideRequest(message);
       if (rideRequest) {
-        console.log(`🚗 RIDE REQUEST: ${rideRequest.pickup} → ${rideRequest.dropoff}`);
+        console.log(`🚗 RIDE REQUEST from ${userPhone.slice(-4)}: ${rideRequest.pickup} → ${rideRequest.dropoff}`);
         
         const { pickup, dropoff } = rideRequest;
+        const distance = calculateDistance(pickup, dropoff);
+        const pickupName = LAGOS_LOCATIONS[pickup].name;
+        const dropoffName = LAGOS_LOCATIONS[dropoff].name;
         
-        // Validate locations exist
-        if (!LAGOS_LOCATIONS[pickup] || !LAGOS_LOCATIONS[dropoff]) {
-          responseMessage = `❓ *Location not recognized*
-
-*Available areas:*
-Ikoyi, VI (Victoria Island), Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
-
-*Try again with:*
-💬 "ride from Ikoyi to VI"
-💬 "ride from Lekki to Ikeja"`;
-        } else {
-          const distance = calculateDistance(pickup, dropoff);
-          const pickupName = LAGOS_LOCATIONS[pickup].name;
-          const dropoffName = LAGOS_LOCATIONS[dropoff].name;
-          
-          // Update session with pending ride
-          session.pendingRide = { pickup, dropoff, distance, pickupName, dropoffName };
-          session.currentState = 'selecting_ride';
-          global.userSessions.set(userPhone, session);
-          
-          responseMessage = `🚗 *Available rides from ${pickupName} to ${dropoffName}:*
+        // Update session with pending ride
+        session.pendingRide = { pickup, dropoff, distance, pickupName, dropoffName };
+        session.currentState = 'selecting_ride';
+        global.userSessions.set(userPhone, session);
+        
+        responseMessage = `🚗 *Available rides from ${pickupName} to ${dropoffName}:*
 
 *1️⃣ 🚗 Economy - ₦${calculateFare('economy', distance).toLocaleString()}*
    ⏱️ 2-4 mins • Budget-friendly
@@ -380,11 +344,12 @@ Ikoyi, VI (Victoria Island), Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, 
    ⏱️ 1-2 mins • Luxury experience
 
 💬 *Type 1, 2, or 3 to book*`;
-        }
       }
       
-      // Handle ride selection (1, 2, 3 - only during booking)
-      else if (['1', '2', '3'].includes(msg) && session.currentState === 'selecting_ride') {
+      // Handle ride selection (1, 2, 3)
+      else if (['1', '2', '3'].includes(msg) && session.currentState === 'selecting_ride' && session.pendingRide) {
+        console.log(`🎯 RIDE SELECTION: Option ${msg} chosen by ${userPhone.slice(-4)}`);
+        
         const selectedOption = parseInt(msg);
         const rideTypes = Object.keys(RIDE_TYPES);
         const selectedRideKey = rideTypes[selectedOption - 1];
@@ -425,7 +390,7 @@ Ikoyi, VI (Victoria Island), Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, 
 💬 *Type "track" to track driver*
 💬 *Type "cancel" if needed*`;
 
-        // Automated ride sequence (PERFORMANCE OPTIMIZED - non-blocking)
+        // Automated ride sequence (non-blocking)
         sendScheduledMessage(userPhone, 
           `🚗 *Driver Arrived!*
 ${driver.name} is waiting outside
@@ -466,7 +431,7 @@ ${driver.name} is waiting outside
           DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
       }
       
-      // Handle tracking - fix condition check
+      // Handle tracking
       else if (msg === 'track') {
         if (session.activeTrip) {
           const { driver, pickup, dropoff, bookingId } = session.activeTrip;
@@ -493,7 +458,7 @@ ${driver.name} is waiting outside
         }
       }
       
-      // Handle cancellation - fix condition check
+      // Handle cancellation
       else if (msg === 'cancel') {
         if (session.activeTrip) {
           session.currentState = 'cancellation_confirm';
@@ -598,6 +563,8 @@ ${feedback}
       
       // Default help for connected users
       else {
+        console.log(`❓ UNKNOWN COMMAND from connected user ${userPhone.slice(-4)}: "${message}"`);
+        
         responseMessage = `🚖 *Fast Cab Commands:*
 
 🔥 *Book a ride:*
@@ -614,18 +581,41 @@ ${feedback}
       }
     }
     
-    // PRIORITY 4: Unconnected users  
+    // PRIORITY 4: Handle new/unconnected users  
     else {
-      responseMessage = `*Please join first by sending:*
+      console.log(`🆕 NEW/UNCONNECTED user ${userPhone.slice(-4)}`);
+      
+      if (['hi', 'hello', 'start', 'hey', 'menu'].includes(message.toLowerCase().trim()) || 
+          message.toLowerCase().includes('hi! i want to try the fast cab demo')) {
+        responseMessage = `🚖 *Welcome to Fast Cab!*
+👋 *Thanks for trying our service!*
+
+⚠️ *Quick setup needed:*
+
+📋 *Step 1:* Copy this code:
+join cap-pleasure
+
+📋 *Step 2:* Send it here
+
+📋 *Step 3:* Book rides like:
+💬 "ride from Ikoyi to VI"  
+💬 "ride from Lekki to Ikeja"
+
+⚡ *Takes 10 seconds • No app needed*
+
+*Copy & send the join code above to start!*`;
+      } else {
+        responseMessage = `*Please join first by sending:*
 join cap-pleasure`;
+      }
     }
 
-    console.log(`✅ Response ready: ${responseMessage.substring(0, 50)}...`);
-    return res.status(200).send(sendMessage('', responseMessage));
+    console.log(`✅ [${userPhone.slice(-4)}] Response: ${responseMessage.substring(0, 50)}...`);
+    return res.status(200).send(createTwiMLResponse(responseMessage));
 
   } catch (error) {
-    console.error('❌ [ERROR]:', error);
-    return res.status(500).send(sendMessage('', '🔧 Temporary issue. Try: "ride from Ikoyi to VI"'));
+    console.error('❌ WEBHOOK ERROR:', error);
+    return res.status(500).send(createTwiMLResponse('🔧 Temporary issue. Try: "ride from Ikoyi to VI"'));
   }
 }
 
@@ -677,5 +667,5 @@ function handlePayment(userPhone, paymentMethod, session, res) {
   session.rating = null;
   global.userSessions.set(userPhone, session);
   
-  return res.status(200).send(sendMessage('', responseMessage));
+  return res.status(200).send(createTwiMLResponse(responseMessage));
 }
