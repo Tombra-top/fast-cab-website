@@ -3,396 +3,770 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fast Cab - Lagos Ride Hailing Demo</title>
+    <meta name="description" content="Fast Cab - Lagos' next-generation WhatsApp ride-hailing platform. Book rides instantly without downloading apps.">
+    <title>Fast Cab - Lagos Ride Hailing via WhatsApp</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --secondary-gradient: linear-gradient(45deg, #25D366, #128C7E);
+            --accent-gradient: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            --glass-bg: rgba(255, 255, 255, 0.95);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-primary: #2c3e50;
+            --text-secondary: #6c757d;
+            --shadow-soft: 0 10px 40px rgba(0, 0, 0, 0.08);
+            --shadow-medium: 0 20px 60px rgba(0, 0, 0, 0.12);
+            --border-radius: 16px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --section-padding: clamp(3rem, 8vw, 6rem);
+            --content-max-width: 1200px;
+        }
+        
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', Roboto, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text-primary);
+            background: var(--primary-gradient);
+            background-attachment: fixed;
             min-height: 100vh;
+            overflow-x: hidden;
         }
         
-        .container {
-            max-width: 800px;
+        /* Skip Link for Accessibility */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--text-primary);
+            color: white;
+            padding: 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 1000;
+        }
+        
+        .skip-link:focus {
+            top: 6px;
+        }
+        
+        /* Layout Container */
+        .page-wrapper {
+            max-width: var(--content-max-width);
             margin: 0 auto;
-            padding: 2rem;
-            text-align: center;
+            padding: 0 clamp(1rem, 4vw, 2rem);
         }
         
+        /* Hero Section */
         .hero {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 3rem 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: var(--section-padding) clamp(1.5rem, 5vw, 3rem);
+            margin: 2rem 0;
+            box-shadow: var(--shadow-medium);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer 3s infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
         }
         
         .logo {
-            font-size: 2.5rem;
+            font-size: clamp(2rem, 6vw, 3rem);
             font-weight: 900;
-            color: #667eea;
-            margin-bottom: 1rem;
-        }
-        
-        .tagline {
-            font-size: 1.2rem;
-            color: #666;
-            margin-bottom: 2rem;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
         }
         
         .demo-badge {
-            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            background: var(--accent-gradient);
             color: white;
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 1.2rem;
             border-radius: 50px;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             font-weight: 600;
-            display: inline-block;
-            margin-bottom: 2rem;
-            animation: pulse 2s infinite;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
         }
         
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
         }
         
-        .cta-button {
-            background: linear-gradient(45deg, #25D366, #128C7E);
+        .hero-title {
+            font-size: clamp(1.25rem, 4vw, 1.5rem);
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-weight: 400;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        /* CTA Section */
+        .cta-section {
+            margin: 2rem 0;
+        }
+        
+        .primary-cta {
+            background: var(--secondary-gradient);
             color: white;
-            padding: 1rem 2rem;
             border: none;
+            padding: 1rem 2.5rem;
             border-radius: 50px;
             font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
             text-decoration: none;
-            display: inline-block;
-            margin: 1rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            transition: var(--transition);
+            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.3);
             position: relative;
             overflow: hidden;
         }
         
-        .cta-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 30px rgba(37, 211, 102, 0.4);
+        .primary-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(37, 211, 102, 0.4);
         }
         
-        .cta-button:active {
-            transform: translateY(-1px);
+        .primary-cta:active {
+            transform: translateY(0);
         }
         
-        .cta-button.loading {
-            background: linear-gradient(45deg, #128C7E, #25D366);
-            animation: loading-gradient 1.5s ease-in-out infinite;
+        .primary-cta.loading {
+            pointer-events: none;
         }
         
-        @keyframes loading-gradient {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
+        .primary-cta.loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: loading-shine 1.5s infinite;
         }
         
-        .sandbox-info {
-            background: #25D366;
+        @keyframes loading-shine {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        /* Setup Instructions */
+        .setup-guide {
+            background: linear-gradient(135deg, #25D366, #128C7E);
             color: white;
-            padding: 1.5rem;
-            border-radius: 15px;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            margin: 2rem 0;
+            box-shadow: var(--shadow-soft);
+        }
+        
+        .setup-guide h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .setup-steps {
+            display: grid;
+            gap: 1rem;
             margin: 1rem 0;
+        }
+        
+        .setup-step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+        }
+        
+        .step-number {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
         }
         
         .sandbox-code {
             background: rgba(0, 0, 0, 0.3);
-            color: #00ff00;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            display: inline-block;
-            margin: 0.5rem;
+            color: #00ff88;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: var(--transition);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            user-select: all;
         }
         
         .sandbox-code:hover {
             background: rgba(0, 0, 0, 0.5);
-            transform: scale(1.05);
+            transform: scale(1.02);
+            border-color: rgba(255, 255, 255, 0.3);
         }
         
-        .features {
+        /* Features Grid */
+        .features-section {
+            margin: 4rem 0;
+        }
+        
+        .section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .section-title {
+            font-size: clamp(1.75rem, 5vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1.5rem;
-            margin: 2rem 0;
         }
         
-        .feature {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 1.5rem;
-            border-radius: 15px;
-            backdrop-filter: blur(5px);
-            transform: translateY(0);
-            transition: transform 0.3s ease;
+        .feature-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: var(--shadow-soft);
+            position: relative;
+            overflow: hidden;
         }
         
-        .feature:hover {
+        .feature-card:hover {
             transform: translateY(-5px);
+            box-shadow: var(--shadow-medium);
         }
         
         .feature-icon {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
         }
         
-        .instructions {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 15px;
-            padding: 2rem;
-            margin: 2rem 0;
-            text-align: left;
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
         }
         
-        .step {
-            margin: 1rem 0;
-            padding: 1rem;
-            background: rgba(102, 126, 234, 0.1);
-            border-radius: 10px;
+        .feature-description {
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        /* Demo Flow */
+        .demo-flow {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 3rem 2rem;
+            margin: 4rem 0;
+            box-shadow: var(--shadow-soft);
+        }
+        
+        .demo-flow h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+        
+        .flow-steps {
+            display: grid;
+            gap: 1.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 12px;
             border-left: 4px solid #667eea;
-            transition: all 0.3s ease;
+            transition: var(--transition);
         }
         
-        .step:hover {
-            background: rgba(102, 126, 234, 0.15);
+        .flow-step:hover {
+            background: rgba(102, 126, 234, 0.1);
             transform: translateX(5px);
         }
         
-        .social-proof {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 15px;
-            padding: 2rem;
-            margin: 2rem 0;
+        .flow-number {
+            background: #667eea;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+            font-size: 0.9rem;
         }
         
+        .flow-content {
+            flex: 1;
+        }
+        
+        .flow-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+        
+        .message-example {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: inline-block;
+            font-family: 'SF Mono', monospace;
+            font-size: 0.875rem;
+            color: #25D366;
+            font-weight: 500;
+            margin: 0.5rem 0;
+            border: 1px solid rgba(37, 211, 102, 0.2);
+        }
+        
+        .flow-note {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+        
+        /* Sample Messages */
+        .samples-section {
+            background: rgba(37, 211, 102, 0.1);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin: 2rem 0;
+            border: 1px solid rgba(37, 211, 102, 0.2);
+        }
+        
+        .samples-section h3 {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+        
+        .sample-messages {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        
+        /* Differentiators */
+        .differentiators {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 3rem 2rem;
+            margin: 4rem 0;
+            box-shadow: var(--shadow-soft);
+        }
+        
+        .differentiator-list {
+            display: grid;
+            gap: 1.5rem;
+            max-width: 800px;
+            margin: 2rem auto 0;
+        }
+        
+        .differentiator {
+            padding: 1.5rem;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+            transition: var(--transition);
+        }
+        
+        .differentiator:hover {
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .differentiator-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Footer CTA */
+        .footer-cta {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 3rem 2rem;
+            margin: 4rem 0 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-soft);
+        }
+        
+        .footer-cta h2 {
+            margin-bottom: 1rem;
+            font-size: 1.75rem;
+        }
+        
+        .footer-description {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-style: italic;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        /* Notification */
         .notification {
             position: fixed;
             top: 20px;
             right: 20px;
             background: #25D366;
             color: white;
-            padding: 1rem;
-            border-radius: 10px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-            transform: translateX(300px);
-            transition: transform 0.3s ease;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow-medium);
+            transform: translateX(350px);
+            transition: var(--transition);
             z-index: 1000;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .notification.show {
             transform: translateX(0);
         }
-
-        .demo-flow {
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 15px;
-            padding: 2rem;
-            margin: 2rem 0;
-            text-align: left;
-        }
-
-        .flow-step {
-            display: flex;
-            align-items: center;
-            margin: 1rem 0;
-            padding: 1rem;
-            background: rgba(102, 126, 234, 0.05);
-            border-radius: 10px;
-        }
-
-        .flow-number {
-            background: #667eea;
-            color: white;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            margin-right: 1rem;
-            flex-shrink: 0;
-        }
-
-        .sample-messages {
-            background: rgba(37, 211, 102, 0.1);
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-            border-left: 4px solid #25D366;
-        }
-
-        .message-example {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            margin: 0.5rem 0;
-            display: inline-block;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .hero {
+                margin: 1rem 0;
+                padding: 2rem 1.5rem;
+            }
+            
+            .primary-cta {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .flow-step {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .flow-number {
+                margin-bottom: 0.5rem;
+            }
+            
+            .sample-messages {
+                flex-direction: column;
+            }
+            
+            .notification {
+                right: 1rem;
+                left: 1rem;
+                transform: translateY(-100px);
+            }
+            
+            .notification.show {
+                transform: translateY(0);
+            }
+            
+            .differentiator {
+                padding: 1rem;
+            }
         }
         
-        @media (max-width: 768px) {
-            .container { padding: 1rem; }
-            .hero { padding: 2rem 1rem; }
-            .logo { font-size: 2rem; }
-            .cta-button { width: 100%; margin: 0.5rem 0; }
-            .notification { right: 10px; left: 10px; transform: translateY(-100px); }
-            .notification.show { transform: translateY(0); }
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* Focus States for Accessibility */
+        button:focus-visible,
+        .sandbox-code:focus-visible {
+            outline: 3px solid #667eea;
+            outline-offset: 2px;
+        }
+        
+        /* High Contrast Mode Support */
+        @media (prefers-contrast: high) {
+            :root {
+                --glass-bg: rgba(255, 255, 255, 0.98);
+                --text-primary: #000000;
+                --text-secondary: #333333;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="hero">
-            <div class="logo">🚖 Fast Cab</div>
-            <div class="demo-badge">🎭 LIVE DEMO</div>
-            <div class="tagline">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</div>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <div class="page-wrapper">
+        <main id="main-content">
+            <!-- Hero Section -->
+            <section class="hero" role="banner">
+                <div class="brand">
+                    <h1 class="logo">🚖 Fast Cab</h1>
+                    <div class="demo-badge" aria-label="Live Demo Available">🎭 LIVE DEMO</div>
+                </div>
+                <p class="hero-title">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</p>
+                
+                <div class="cta-section">
+                    <button class="primary-cta" onclick="startDemo()" id="demo-button" aria-describedby="setup-instructions">
+                        📱 Try Live Demo Now
+                    </button>
+                    
+                    <div class="setup-guide" id="setup-instructions">
+                        <h3>📱 First-Time Setup (30 seconds):</h3>
+                        <div class="setup-steps">
+                            <div class="setup-step">
+                                <div class="step-number" aria-hidden="true">1</div>
+                                <span>Click "Try Live Demo Now" above</span>
+                            </div>
+                            <div class="setup-step">
+                                <div class="step-number" aria-hidden="true">2</div>
+                                <div>
+                                    Copy & send this code: 
+                                    <div class="sandbox-code" 
+                                         onclick="copySandboxCode()" 
+                                         id="sandbox-code"
+                                         tabindex="0"
+                                         role="button"
+                                         aria-label="Copy sandbox code: join cap-pleasure">
+                                        join cap-pleasure
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setup-step">
+                                <div class="step-number" aria-hidden="true">3</div>
+                                <span>Say "Hi" to start booking rides</span>
+                            </div>
+                        </div>
+                        <p><strong>✨ Demo runs automatically in 30 seconds!</strong></p>
+                    </div>
+                </div>
+            </section>
             
-            <button class="cta-button" onclick="startDemo()" id="demo-button">
-                📱 Try Live Demo Now
-            </button>
+            <!-- Features Section -->
+            <section class="features-section">
+                <div class="section-header">
+                    <h2 class="section-title">Why Choose Fast Cab?</h2>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">⚡</span>
+                        <h3 class="feature-title">Instant Booking</h3>
+                        <p class="feature-description">One message to book: "ride from A to B"</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">🚗</span>
+                        <h3 class="feature-title">3 Ride Types</h3>
+                        <p class="feature-description">Economy, Comfort & Premium options</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">💰</span>
+                        <h3 class="feature-title">Upfront Pricing</h3>
+                        <p class="feature-description">See exact fare before you book</p>
+                    </div>
+                    <div class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">👨‍✈️</span>
+                        <h3 class="feature-title">Driver Profiles</h3>
+                        <p class="feature-description">Name, rating, vehicle & phone number</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Demo Flow Section -->
+            <section class="demo-flow">
+                <h2>🎯 30-Second Demo Experience</h2>
+                
+                <div class="flow-steps">
+                    <div class="flow-step">
+                        <div class="flow-number" aria-hidden="true">1</div>
+                        <div class="flow-content">
+                            <div class="flow-title">Quick Setup:</div>
+                            <p>Join sandbox (first time only)</p>
+                            <div class="message-example">join cap-pleasure</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-number" aria-hidden="true">2</div>
+                        <div class="flow-content">
+                            <div class="flow-title">Start Demo:</div>
+                            <p>Say hi to activate</p>
+                            <div class="message-example">Hi</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-number" aria-hidden="true">3</div>
+                        <div class="flow-content">
+                            <div class="flow-title">Book Ride:</div>
+                            <p>One message booking</p>
+                            <div class="message-example">ride from Ikoyi to Victoria Island</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-number" aria-hidden="true">4</div>
+                        <div class="flow-content">
+                            <div class="flow-title">Choose Type:</div>
+                            <p>Select Economy, Comfort, or Premium</p>
+                            <div class="message-example">1 (for Economy)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-number" aria-hidden="true">5</div>
+                        <div class="flow-content">
+                            <div class="flow-title">Auto Demo:</div>
+                            <p>Watch driver assignment → arrival → trip completion</p>
+                            <div class="flow-note">✨ Fully automated - no input needed!</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sample Messages -->
+            <section class="samples-section">
+                <h3>💬 Try These Sample Bookings:</h3>
+                <div class="sample-messages">
+                    <div class="message-example">ride from Ikoyi to VI</div>
+                    <div class="message-example">ride from Lekki to Ikeja</div>
+                    <div class="message-example">ride from Surulere to Lagos Island</div>
+                    <div class="message-example">ride from Ajah to Yaba</div>
+                </div>
+            </section>
             
-            <div class="sandbox-info">
-                <h3>📱 First-Time Setup (30 seconds):</h3>
-                <p><strong>1.</strong> Click "Try Live Demo Now" above</p>
-                <p><strong>2.</strong> Copy & send this code: 
-                    <span class="sandbox-code" onclick="copySandboxCode()" id="sandbox-code">
-                        join cap-pleasure
-                    </span>
+            <!-- Differentiators -->
+            <section class="differentiators">
+                <div class="section-header">
+                    <h2>🚀 What Makes Fast Cab Different?</h2>
+                </div>
+                
+                <div class="differentiator-list">
+                    <div class="differentiator">
+                        <div class="differentiator-title">No App Download:</div>
+                        <p>Works directly in WhatsApp - the app Lagosians already use daily</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Natural Language:</div>
+                        <p>Just say where you want to go, no complex forms</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Lightning Fast:</div>
+                        <p>From "Hi" to booked ride in 3 messages</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Lagos-Optimized:</div>
+                        <p>Built specifically for Lagos routes, traffic patterns, and locations</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Transparent Pricing:</div>
+                        <p>See exact fare upfront, no surge surprises</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Footer CTA -->
+            <section class="footer-cta">
+                <h2>🚀 Built for Lagos</h2>
+                <p class="footer-description">
+                    This is a functional MVP demo. Your feedback helps shape the future of ride-hailing in Lagos!
                 </p>
-                <p><strong>3.</strong> Say "Hi" to start booking rides</p>
-                <p><strong>✨ Demo runs automatically in 30 seconds!</strong></p>
-            </div>
-        </div>
-        
-        <div class="features">
-            <div class="feature">
-                <div class="feature-icon">⚡</div>
-                <h3>Instant Booking</h3>
-                <p>One message to book: "ride from A to B"</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🚗</div>
-                <h3>3 Ride Types</h3>
-                <p>Economy, Comfort & Premium options</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">💰</div>
-                <h3>Upfront Pricing</h3>
-                <p>See exact fare before you book</p>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">👨‍✈️</div>
-                <h3>Driver Profiles</h3>
-                <p>Name, rating, vehicle & phone number</p>
-            </div>
-        </div>
-
-        <div class="demo-flow">
-            <h2>🎯 30-Second Demo Experience</h2>
-            
-            <div class="flow-step">
-                <div class="flow-number">1</div>
-                <div>
-                    <strong>Quick Setup:</strong> Join sandbox (first time only)
-                    <div class="message-example">join cap-pleasure</div>
-                </div>
-            </div>
-            
-            <div class="flow-step">
-                <div class="flow-number">2</div>
-                <div>
-                    <strong>Start Demo:</strong> Say hi to activate
-                    <div class="message-example">Hi</div>
-                </div>
-            </div>
-            
-            <div class="flow-step">
-                <div class="flow-number">3</div>
-                <div>
-                    <strong>Book Ride:</strong> One message booking
-                    <div class="message-example">ride from Ikoyi to Victoria Island</div>
-                </div>
-            </div>
-            
-            <div class="flow-step">
-                <div class="flow-number">4</div>
-                <div>
-                    <strong>Choose Type:</strong> Select Economy, Comfort, or Premium
-                    <div class="message-example">1 (for Economy)</div>
-                </div>
-            </div>
-            
-            <div class="flow-step">
-                <div class="flow-number">5</div>
-                <div>
-                    <strong>Auto Demo:</strong> Watch driver assignment → arrival → trip completion
-                    <p style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
-                        ✨ Fully automated - no input needed!
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="sample-messages">
-            <h3>💬 Try These Sample Bookings:</h3>
-            <div class="message-example">ride from Ikoyi to VI</div>
-            <div class="message-example">ride from Lekki to Ikeja</div>
-            <div class="message-example">ride from Surulere to Lagos Island</div>
-            <div class="message-example">ride from Ajah to Yaba</div>
-        </div>
-        
-        <div class="instructions">
-            <h2>🚀 What Makes Fast Cab Different?</h2>
-            
-            <div class="step">
-                <strong>No App Download:</strong> Works directly in WhatsApp - the app Lagosians already use daily
-            </div>
-            
-            <div class="step">
-                <strong>Natural Language:</strong> Just say where you want to go, no complex forms
-            </div>
-            
-            <div class="step">
-                <strong>Lightning Fast:</strong> From "Hi" to booked ride in 3 messages
-            </div>
-            
-            <div class="step">
-                <strong>Lagos-Optimized:</strong> Built specifically for Lagos routes, traffic patterns, and locations
-            </div>
-            
-            <div class="step">
-                <strong>Transparent Pricing:</strong> See exact fare upfront, no surge surprises
-            </div>
-        </div>
-        
-        <div class="social-proof">
-            <h2>🚀 Built for Lagos</h2>
-            <p><strong>No App Download:</strong> Works directly in WhatsApp - the app Lagosians already use daily</p>
-            <p><strong>Lagos-Optimized:</strong> Built specifically for Lagos routes, traffic patterns, and locations</p>
-            <p><strong>Lightning Fast:</strong> From "Hi" to booked ride in 3 messages</p>
-            <p><strong>Transparent Pricing:</strong> See exact fare upfront, no surge surprises</p>
-            <br>
-            <p><em>This is a functional MVP demo. Your feedback helps shape the future of ride-hailing in Lagos!</em></p>
-        </div>
+                <button class="primary-cta" onclick="startDemo()">
+                    🚀 Start Your Demo Experience
+                </button>
+            </section>
+        </main>
     </div>
     
-    <div id="notification" class="notification">
+    <div id="notification" class="notification" role="alert" aria-live="polite">
         📋 Code copied! Paste in WhatsApp
     </div>
     
@@ -402,9 +776,14 @@
             navigator.clipboard.writeText(code).then(() => {
                 showNotification('📋 Code copied! Paste in WhatsApp');
             }).catch(() => {
+                // Fallback for older browsers
                 const textArea = document.createElement('textarea');
                 textArea.value = code;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
                 document.body.appendChild(textArea);
+                textArea.focus();
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
@@ -412,13 +791,21 @@
             });
         }
         
+        // Make sandbox code accessible via keyboard
+        document.getElementById('sandbox-code').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                copySandboxCode();
+            }
+        });
+        
         function showNotification(message) {
             const notification = document.getElementById('notification');
-            notification.innerHTML = message;
+            notification.textContent = message;
             notification.classList.add('show');
             setTimeout(() => {
                 notification.classList.remove('show');
-            }, 3000);
+            }, 4000);
         }
         
         function startDemo() {
@@ -428,6 +815,7 @@
             
             button.classList.add('loading');
             button.innerHTML = '🔄 Opening WhatsApp...';
+            button.disabled = true;
             
             const waUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
             
@@ -436,7 +824,7 @@
             if (isMobile) {
                 window.location.href = waUrl;
             } else {
-                window.open(waUrl, '_blank');
+                window.open(waUrl, '_blank', 'noopener,noreferrer');
             }
             
             setTimeout(() => {
@@ -446,26 +834,67 @@
             setTimeout(() => {
                 button.classList.remove('loading');
                 button.innerHTML = '📱 Try Live Demo Now';
+                button.disabled = false;
             }, 5000);
-            
-            console.log('Fast Cab demo started');
         }
         
+        // Enhanced button interactions
         document.addEventListener('DOMContentLoaded', function() {
-            const button = document.getElementById('demo-button');
+            const buttons = document.querySelectorAll('.primary-cta');
             
-            button.addEventListener('mouseenter', function() {
-                if (!this.classList.contains('loading')) {
-                    this.innerHTML = '🚀 Start Demo Experience';
-                }
+            buttons.forEach(button => {
+                const originalText = button.innerHTML;
+                
+                button.addEventListener('mouseleave', function() {
+                    if (!this.classList.contains('loading')) {
+                        this.innerHTML = originalText;
+                    }
+                });
             });
-            
-            button.addEventListener('mouseleave', function() {
-                if (!this.classList.contains('loading')) {
-                    this.innerHTML = '📱 Try Live Demo Now';
+        });
+        
+        // Smooth scroll for any internal links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
                 }
             });
         });
+        
+        // Enhanced accessibility for screen readers
+        function announceToScreenReader(message) {
+            const announcement = document.createElement('div');
+            announcement.setAttribute('aria-live', 'polite');
+            announcement.setAttribute('aria-atomic', 'true');
+            announcement.style.position = 'absolute';
+            announcement.style.left = '-10000px';
+            announcement.style.width = '1px';
+            announcement.style.height = '1px';
+            announcement.style.overflow = 'hidden';
+            announcement.textContent = message;
+            document.body.appendChild(announcement);
+            
+            setTimeout(() => {
+                document.body.removeChild(announcement);
+            }, 1000);
+        }
+        
+        // Performance optimization: Reduce animations on slower devices
+        if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) {
+            document.documentElement.style.setProperty('--transition', 'all 0.2s ease');
+        }
     </script>
 </body>
-</html>
+</html>mouseenter', function() {
+                    if (!this.classList.contains('loading')) {
+                        this.innerHTML = '🚀 Start Demo Experience';
+                    }
+                });
+                
+                button.addEventListener('
