@@ -225,10 +225,12 @@ async function sendScheduledMessage(userPhone, message, delay) {
   }, delay);
 }
 
-// Check sandbox status (simplified for performance)
+// Check sandbox status (auto-detect for multiple users)
 async function checkSandboxStatus(userPhone) {
-  // For performance, assume connected if they can send messages
-  return true;
+  // For WhatsApp Business API sandbox, users are connected if they can send messages
+  // In production, check if user has completed sandbox join process
+  const session = global.userSessions.get(userPhone);
+  return session?.connected || false;
 }
 
 // MAIN WEBHOOK HANDLER
@@ -260,8 +262,11 @@ export default async function handler(req, res) {
 
     let responseMessage = '';
     
-    // Get user session
-    let session = global.userSessions.get(userPhone) || { connected: false };
+    // Get user session - fix session initialization
+    let session = global.userSessions.get(userPhone) || { 
+      connected: false,
+      currentState: 'new_user'
+    };
 
     // PRIORITY 1: Handle sandbox join (new user setup)
     if (isSandboxJoinMessage(message)) {
@@ -296,11 +301,10 @@ export default async function handler(req, res) {
       if (isConnected) {
         console.log('👋 RETURNING USER - Direct to welcome menu');
         
-        if (!session.connected) {
-          session.connected = true;
-          session.currentState = 'welcome';
-          global.userSessions.set(userPhone, session);
-        }
+        // Ensure session is properly set for returning users
+        session.connected = true;
+        session.currentState = 'welcome';
+        global.userSessions.set(userPhone, session);
         
         responseMessage = `🚖 *Welcome back to Fast Cab!*
 
@@ -337,21 +341,34 @@ join cap-pleasure
     else if (session.connected) {
       const msg = message.toLowerCase().trim();
       
-      // Handle ride booking requests
+      // Handle ride booking requests - FIXED parsing logic
       const rideRequest = parseRideRequest(message);
       if (rideRequest) {
         console.log(`🚗 RIDE REQUEST: ${rideRequest.pickup} → ${rideRequest.dropoff}`);
         
         const { pickup, dropoff } = rideRequest;
-        const distance = calculateDistance(pickup, dropoff);
-        const pickupName = LAGOS_LOCATIONS[pickup].name;
-        const dropoffName = LAGOS_LOCATIONS[dropoff].name;
         
-        session.pendingRide = { pickup, dropoff, distance, pickupName, dropoffName };
-        session.currentState = 'selecting_ride';
-        global.userSessions.set(userPhone, session);
-        
-        responseMessage = `🚗 *Available rides from ${pickupName} to ${dropoffName}:*
+        // Validate locations exist
+        if (!LAGOS_LOCATIONS[pickup] || !LAGOS_LOCATIONS[dropoff]) {
+          responseMessage = `❓ *Location not recognized*
+
+*Available areas:*
+Ikoyi, VI (Victoria Island), Lekki, Ikeja, Surulere, Yaba, Lagos Island, Apapa, Ajah
+
+*Try again with:*
+💬 "ride from Ikoyi to VI"
+💬 "ride from Lekki to Ikeja"`;
+        } else {
+          const distance = calculateDistance(pickup, dropoff);
+          const pickupName = LAGOS_LOCATIONS[pickup].name;
+          const dropoffName = LAGOS_LOCATIONS[dropoff].name;
+          
+          // Update session with pending ride
+          session.pendingRide = { pickup, dropoff, distance, pickupName, dropoffName };
+          session.currentState = 'selecting_ride';
+          global.userSessions.set(userPhone, session);
+          
+          responseMessage = `🚗 *Available rides from ${pickupName} to ${dropoffName}:*
 
 *1️⃣ 🚗 Economy - ₦${calculateFare('economy', distance).toLocaleString()}*
    ⏱️ 2-4 mins • Budget-friendly
@@ -363,6 +380,7 @@ join cap-pleasure
    ⏱️ 1-2 mins • Luxury experience
 
 💬 *Type 1, 2, or 3 to book*`;
+        }
       }
       
       // Handle ride selection (1, 2, 3 - only during booking)
@@ -448,10 +466,11 @@ ${driver.name} is waiting outside
           DEMO_TIMINGS.DRIVER_ARRIVAL + DEMO_TIMINGS.TRIP_START + DEMO_TIMINGS.TRIP_DURATION);
       }
       
-      // Handle tracking
-      else if (msg === 'track' && session.activeTrip) {
-        const { driver, pickup, dropoff, bookingId } = session.activeTrip;
-        responseMessage = `🔍 *Live Trip Tracking*
+      // Handle tracking - fix condition check
+      else if (msg === 'track') {
+        if (session.activeTrip) {
+          const { driver, pickup, dropoff, bookingId } = session.activeTrip;
+          responseMessage = `🔍 *Live Trip Tracking*
 
 📍 *Booking: ${bookingId}*
 👨‍✈️ *Driver: ${driver.name}*
@@ -463,14 +482,24 @@ ${driver.name} is waiting outside
 ⏱️ *ETA: Few minutes*
 
 🛡️ *Your safety is our priority!*`;
+        } else {
+          responseMessage = `❌ *No active trip to track*
+
+*Start a new ride:*
+💬 "ride from Ikoyi to VI"
+💬 "ride from Lekki to Ikeja"
+
+*Copy any route above!*`;
+        }
       }
       
-      // Handle cancellation
-      else if (msg === 'cancel' && session.activeTrip) {
-        session.currentState = 'cancellation_confirm';
-        global.userSessions.set(userPhone, session);
-        
-        responseMessage = `⚠️ *Cancel Trip Confirmation*
+      // Handle cancellation - fix condition check
+      else if (msg === 'cancel') {
+        if (session.activeTrip) {
+          session.currentState = 'cancellation_confirm';
+          global.userSessions.set(userPhone, session);
+          
+          responseMessage = `⚠️ *Cancel Trip Confirmation*
 
 📍 *Booking: ${session.activeTrip.bookingId}*
 👨‍✈️ *Driver: ${session.activeTrip.driver.name}*
@@ -479,6 +508,15 @@ ${driver.name} is waiting outside
 
 💬 *Type "yes" to cancel*  
 💬 *Type "no" to continue trip*`;
+        } else {
+          responseMessage = `❌ *No active trip to cancel*
+
+*Start a new ride:*
+💬 "ride from Ikoyi to VI"
+💬 "ride from Lekki to Ikeja"
+
+*Copy any route above!*`;
+        }
       }
       
       // Handle cancellation confirmation  
