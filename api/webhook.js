@@ -1,6 +1,9 @@
 // Fast Cab WhatsApp Webhook - Final Production Version
 // This webhook handles ride-hailing demo for WhatsApp
 
+// Store for tracking message sequences (temporary in-memory storage)
+const messageSequences = new Map();
+
 export default async function handler(req, res) {
   // CORS headers for web requests
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,7 +43,8 @@ export default async function handler(req, res) {
     }
     else if (isRideSelection(messageText)) {
       responseMessage = getBookingConfirmation(messageText);
-      scheduleRideUpdates(from);
+      // Start automated ride sequence
+      startRideSequence(from, messageText);
     }
     else if (isRating(messageText)) {
       responseMessage = getRatingResponse(messageText);
@@ -197,8 +201,6 @@ function getBookingConfirmation(selection) {
 
 🔄 *Status:* Driver is on the way...
 
-💬 Driver says: "Good morning! I'm 2 minutes away, waiting by the main road."
-
 *Your ride will start automatically...*`;
 }
 
@@ -304,19 +306,94 @@ function normalizeLocation(location) {
          location.charAt(0).toUpperCase() + location.slice(1).toLowerCase();
 }
 
-// Schedule follow-up messages (simulation)
-function scheduleRideUpdates(phoneNumber) {
-  // In production, you'd use a job queue or scheduled function
-  // This is just for demo purposes
-  console.log(`📅 Scheduled ride updates for ${phoneNumber}`);
+// Start automated ride sequence with proper intervals
+function startRideSequence(phoneNumber, rideSelection) {
+  console.log(`🚀 Starting ride sequence for ${phoneNumber}`);
   
-  // Simulate driver arrival after 15 seconds
-  setTimeout(() => {
-    console.log(`🚗 Driver arrived for ${phoneNumber}`);
-  }, 15000);
+  const rideTypes = {
+    '1': { name: 'Economy', icon: '🚗' },
+    '2': { name: 'Comfort', icon: '🚙' },  
+    '3': { name: 'Premium', icon: '🚘' }
+  };
   
-  // Simulate trip completion after 45 seconds
-  setTimeout(() => {
-    console.log(`🏁 Trip completed for ${phoneNumber}`);
-  }, 45000);
+  const selectedRide = rideTypes[rideSelection];
+  
+  // Message 1: Driver Arrived (after 8 seconds)
+  setTimeout(async () => {
+    try {
+      await sendFollowUpMessage(phoneNumber, `🚗 *Driver has arrived!*
+
+Your driver is outside. Look for the Honda Accord (ABC-123-XY).
+
+🎯 *Status:* Trip started - on our way to destination...`);
+    } catch (error) {
+      console.error('Error sending driver arrival message:', error);
+    }
+  }, 8000);
+
+  // Message 2: Trip Progress (after 16 seconds total)
+  setTimeout(async () => {
+    try {
+      await sendFollowUpMessage(phoneNumber, `🛣️ *Trip in progress...*
+
+📍 Current location: Halfway to destination
+⏱️ ETA: 8 minutes remaining
+🚦 Traffic: Light
+
+Driver is taking the fastest route for you! 🚖`);
+    } catch (error) {
+      console.error('Error sending progress message:', error);
+    }
+  }, 16000);
+
+  // Message 3: Almost There (after 24 seconds total)
+  setTimeout(async () => {
+    try {
+      await sendFollowUpMessage(phoneNumber, `🎯 *Almost there!*
+
+📍 2 minutes to destination
+🚖 Preparing to arrive
+
+Get ready to exit the vehicle safely! ✨`);
+    } catch (error) {
+      console.error('Error sending almost there message:', error);
+    }
+  }, 24000);
+
+  // Message 4: Trip Completed (after 32 seconds total)
+  setTimeout(async () => {
+    try {
+      await sendFollowUpMessage(phoneNumber, `🏁 *Trip completed!*
+
+Hope you enjoyed your ride with Fast Cab!
+
+*Trip Summary:*
+💰 Fare: ₦2,500
+⏱️ Duration: 18 mins  
+📍 Distance: 12.3 km
+
+*Rate your experience:*
+⭐ Reply 1-5 stars (5 = excellent)
+or
+💰 *Pay Now:* Reply "pay cash" or "pay transfer"`);
+    } catch (error) {
+      console.error('Error sending completion message:', error);
+    }
+  }, 32000);
+}
+
+// Send follow-up message via HTTP (simulated)
+async function sendFollowUpMessage(to, message) {
+  console.log(`📤 Sending follow-up to ${to}: ${message.substring(0, 50)}...`);
+  
+  // In a real implementation, you would use Twilio's API here:
+  // const client = twilio(accountSid, authToken);
+  // await client.messages.create({
+  //   body: message,
+  //   from: 'whatsapp:+14155238886', // Your sandbox number
+  //   to: to
+  // });
+  
+  // For demo purposes, we just log it
+  // The messages will appear as scheduled logs in Vercel
 }
