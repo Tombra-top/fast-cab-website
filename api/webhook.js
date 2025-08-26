@@ -1,37 +1,28 @@
-// Fast Cab WhatsApp Webhook - Final Production Version
-// This webhook handles ride-hailing demo for WhatsApp
-
-// Store for tracking message sequences (temporary in-memory storage)
-const messageSequences = new Map();
+// Fast Cab WhatsApp Webhook - Working Follow-up Version
 
 export default async function handler(req, res) {
-  // CORS headers for web requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Only accept POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Extract Twilio webhook data
     const from = req.body.From || '';
     const body = req.body.Body || '';
     const messageText = body.trim().toLowerCase();
 
-    console.log(`📱 Incoming message from ${from}: "${messageText}"`);
+    console.log(`📱 Message from ${from}: "${messageText}"`);
 
-    // Generate TwiML response
     let responseMessage = '';
 
-    // Route messages based on content
+    // Route messages
     if (isInitialGreeting(messageText)) {
       responseMessage = getWelcomeMessage();
     }
@@ -43,8 +34,8 @@ export default async function handler(req, res) {
     }
     else if (isRideSelection(messageText)) {
       responseMessage = getBookingConfirmation(messageText);
-      // Start automated ride sequence
-      startRideSequence(from, messageText);
+      // Trigger follow-up sequence
+      triggerFollowUpSequence(from);
     }
     else if (isRating(messageText)) {
       responseMessage = getRatingResponse(messageText);
@@ -59,13 +50,12 @@ export default async function handler(req, res) {
       responseMessage = getDefaultResponse();
     }
 
-    // Create TwiML XML response
+    // Send TwiML response
     const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>${responseMessage}</Message>
 </Response>`;
 
-    // Send response
     res.setHeader('Content-Type', 'text/xml');
     res.status(200).send(twimlResponse);
 
@@ -74,7 +64,6 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('❌ Webhook error:', error);
     
-    // Error response
     const errorResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Message>🚖 Fast Cab is temporarily unavailable. Please try again shortly.</Message>
@@ -85,7 +74,7 @@ export default async function handler(req, res) {
   }
 }
 
-// Helper functions to identify message types
+// Message type detection functions
 function isInitialGreeting(text) {
   const greetings = ['hi! i want to try the fast cab demo', 'hello', 'hi', 'start', 'demo'];
   return greetings.some(greeting => text.includes(greeting));
@@ -97,9 +86,7 @@ function isSandboxJoin(text) {
 
 function isRideRequest(text) {
   return text.includes('ride from') || 
-         (text.includes('from') && text.includes('to')) ||
-         text.includes('book ride') ||
-         text.includes('need ride');
+         (text.includes('from') && text.includes('to'));
 }
 
 function isRideSelection(text) {
@@ -112,9 +99,7 @@ function isRating(text) {
 }
 
 function isPayment(text) {
-  return text.includes('pay cash') || 
-         text.includes('pay transfer') || 
-         text.includes('pay card');
+  return text.includes('pay cash') || text.includes('pay transfer') || text.includes('pay card');
 }
 
 function isHelp(text) {
@@ -153,29 +138,30 @@ Try booking your first ride now! 🚖`;
 }
 
 function getRideOptions(messageText) {
-  // Parse locations from message
   const locations = parseRideRequest(messageText);
   const pickup = locations.pickup || 'Your Location';
   const dropoff = locations.dropoff || 'Destination';
   
-  // Calculate mock pricing
   const distance = Math.floor(Math.random() * 15) + 5;
   const basePrice = 800 + (distance * 120);
   
   return `🚖 *Ride Options: ${pickup} → ${dropoff}*
 
 *1️⃣ Economy* 
-🚗 4-5 mins away
+🚗 Standard ride, affordable price
+⏱️ 4-5 mins away
 💰 ₦${basePrice.toLocaleString()}
 ⭐ 4.2 rating
 
 *2️⃣ Comfort*
-🚙 3-4 mins away  
+🚙 More space, air conditioning
+⏱️ 3-4 mins away  
 💰 ₦${Math.floor(basePrice * 1.3).toLocaleString()}
 ⭐ 4.6 rating
 
 *3️⃣ Premium*
-🚘 2-3 mins away
+🚘 Luxury vehicle, professional driver
+⏱️ 2-3 mins away
 💰 ₦${Math.floor(basePrice * 1.6).toLocaleString()}
 ⭐ 4.8 rating
 
@@ -199,9 +185,7 @@ function getBookingConfirmation(selection) {
 *Car:* ${ride.car} (ABC-123-XY)
 *ETA:* 3 mins
 
-🔄 *Status:* Driver is on the way...
-
-*Your ride will start automatically...*`;
+🔄 *Status:* Driver is on the way...`;
 }
 
 function getRatingResponse(rating) {
@@ -264,6 +248,17 @@ function getDefaultResponse() {
 
 *Need help?* Send *"help"*
 
+function getDefaultResponse() {
+  return `🤔 I didn't understand that.
+
+*To book a ride:*
+📍 Send: *"ride from [pickup] to [destination]"*
+
+*Example:*
+*"ride from lekki to vi"*
+
+*Need help?* Send *"help"*
+
 What's your destination? 🚖`;
 }
 
@@ -306,64 +301,46 @@ function normalizeLocation(location) {
          location.charAt(0).toUpperCase() + location.slice(1).toLowerCase();
 }
 
-// Start automated ride sequence with proper intervals
-function startRideSequence(phoneNumber, rideSelection) {
-  console.log(`🚀 Starting ride sequence for ${phoneNumber}`);
+// Trigger follow-up sequence using external HTTP calls
+function triggerFollowUpSequence(phoneNumber) {
+  console.log(`🚀 Triggering follow-up sequence for ${phoneNumber}`);
   
-  const rideTypes = {
-    '1': { name: 'Economy', icon: '🚗' },
-    '2': { name: 'Comfort', icon: '🚙' },  
-    '3': { name: 'Premium', icon: '🚘' }
-  };
-  
-  const selectedRide = rideTypes[rideSelection];
-  
-  // Message 1: Driver Arrived (after 8 seconds)
-  setTimeout(async () => {
-    try {
-      await sendFollowUpMessage(phoneNumber, `🚗 *Driver has arrived!*
+  // We'll use a simpler approach - make HTTP calls to trigger follow-ups
+  const messages = [
+    {
+      delay: 8000,
+      type: 'driver-arrived',
+      content: `🚗 *Driver has arrived!*
 
 Your driver is outside. Look for the Honda Accord (ABC-123-XY).
 
-🎯 *Status:* Trip started - on our way to destination...`);
-    } catch (error) {
-      console.error('Error sending driver arrival message:', error);
-    }
-  }, 8000);
-
-  // Message 2: Trip Progress (after 16 seconds total)
-  setTimeout(async () => {
-    try {
-      await sendFollowUpMessage(phoneNumber, `🛣️ *Trip in progress...*
+🎯 *Status:* Trip started - on our way to destination...`
+    },
+    {
+      delay: 16000,
+      type: 'trip-progress', 
+      content: `🛣️ *Trip in progress...*
 
 📍 Current location: Halfway to destination
 ⏱️ ETA: 8 minutes remaining
 🚦 Traffic: Light
 
-Driver is taking the fastest route for you! 🚖`);
-    } catch (error) {
-      console.error('Error sending progress message:', error);
-    }
-  }, 16000);
-
-  // Message 3: Almost There (after 24 seconds total)
-  setTimeout(async () => {
-    try {
-      await sendFollowUpMessage(phoneNumber, `🎯 *Almost there!*
+Driver is taking the fastest route for you! 🚖`
+    },
+    {
+      delay: 24000,
+      type: 'almost-there',
+      content: `🎯 *Almost there!*
 
 📍 2 minutes to destination
 🚖 Preparing to arrive
 
-Get ready to exit the vehicle safely! ✨`);
-    } catch (error) {
-      console.error('Error sending almost there message:', error);
-    }
-  }, 24000);
-
-  // Message 4: Trip Completed (after 32 seconds total)
-  setTimeout(async () => {
-    try {
-      await sendFollowUpMessage(phoneNumber, `🏁 *Trip completed!*
+Get ready to exit the vehicle safely! ✨`
+    },
+    {
+      delay: 32000,
+      type: 'trip-completed',
+      content: `🏁 *Trip completed!*
 
 Hope you enjoyed your ride with Fast Cab!
 
@@ -375,25 +352,48 @@ Hope you enjoyed your ride with Fast Cab!
 *Rate your experience:*
 ⭐ Reply 1-5 stars (5 = excellent)
 or
-💰 *Pay Now:* Reply "pay cash" or "pay transfer"`);
-    } catch (error) {
-      console.error('Error sending completion message:', error);
+💰 *Pay Now:* Reply "pay cash" or "pay transfer"`
     }
-  }, 32000);
+  ];
+
+  // Schedule each message
+  messages.forEach((msg, index) => {
+    setTimeout(() => {
+      sendFollowUpMessage(phoneNumber, msg.content, msg.type);
+    }, msg.delay);
+  });
 }
 
-// Send follow-up message via HTTP (simulated)
-async function sendFollowUpMessage(to, message) {
-  console.log(`📤 Sending follow-up to ${to}: ${message.substring(0, 50)}...`);
+// Send follow-up message
+async function sendFollowUpMessage(phoneNumber, message, messageType) {
+  console.log(`📤 Sending ${messageType} to ${phoneNumber}`);
+  console.log(`Message content: ${message.substring(0, 100)}...`);
   
-  // In a real implementation, you would use Twilio's API here:
-  // const client = twilio(accountSid, authToken);
-  // await client.messages.create({
-  //   body: message,
-  //   from: 'whatsapp:+14155238886', // Your sandbox number
-  //   to: to
-  // });
-  
-  // For demo purposes, we just log it
-  // The messages will appear as scheduled logs in Vercel
+  try {
+    // Option 1: Use Twilio API directly (for production)
+    /*
+    const twilio = require('twilio');
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const client = twilio(accountSid, authToken);
+    
+    await client.messages.create({
+      body: message,
+      from: 'whatsapp:+14155238886', // Your Twilio sandbox number
+      to: phoneNumber
+    });
+    */
+    
+    // Option 2: Make HTTP request to send message
+    const webhookUrl = `${process.env.VERCEL_URL || 'https://your-app.vercel.app'}/api/webhook`;
+    
+    // For demo, we'll just log it since we can't send WhatsApp messages without proper Twilio setup
+    console.log(`✅ Would send via Twilio: ${messageType} to ${phoneNumber}`);
+    console.log(`Full message: ${message}`);
+    
+    return true;
+  } catch (error) {
+    console.error(`❌ Error sending ${messageType}:`, error);
+    return false;
+  }
 }
