@@ -685,6 +685,115 @@
             }
         }
     </style>
+    <script>
+        // WhatsApp redirect functionality
+        function startDemo() {
+            const button = document.getElementById('demo-button');
+            const message = "Hi! I want to try the Fast Cab demo";
+            const whatsappNumber = "+14155238886"; // Replace with your actual Twilio WhatsApp sandbox number
+            
+            // Add loading state
+            button.classList.add('loading');
+            button.textContent = 'Opening WhatsApp...';
+            
+            // WhatsApp URL with pre-filled message
+            const whatsappURL = `https://wa.me/${whatsappNumber.replace('+', '')}?text=${encodeURIComponent(message)}`;
+            
+            // Show notification
+            showNotification('Opening WhatsApp with demo message...');
+            
+            // Open WhatsApp
+            setTimeout(() => {
+                window.open(whatsappURL, '_blank');
+                
+                // Reset button after delay
+                setTimeout(() => {
+                    button.classList.remove('loading');
+                    button.textContent = 'Try Live Demo Now';
+                }, 2000);
+            }, 500);
+        }
+
+        // Copy sandbox code functionality
+        function copySandboxCode() {
+            const code = 'join cap-pleasure';
+            
+            // Try to copy to clipboard
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(code).then(() => {
+                    showNotification('Sandbox code copied to clipboard!');
+                }).catch(() => {
+                    // Fallback for older browsers
+                    fallbackCopy(code);
+                });
+            } else {
+                fallbackCopy(code);
+            }
+        }
+
+        // Fallback copy method for older browsers
+        function fallbackCopy(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showNotification('Sandbox code copied to clipboard!');
+            } catch (err) {
+                showNotification('Please manually copy: join cap-pleasure');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // Show notification
+        function showNotification(message) {
+            // Remove existing notification if any
+            const existing = document.querySelector('.notification');
+            if (existing) {
+                existing.remove();
+            }
+            
+            // Create new notification
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Show notification
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // Hide notification after 4 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 400);
+            }, 4000);
+        }
+
+        // Enhanced keyboard support
+        document.addEventListener('DOMContentLoaded', function() {
+            const sandboxCode = document.getElementById('sandbox-code');
+            
+            sandboxCode.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    copySandboxCode();
+                }
+            });
+        });
+    </script>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -832,3 +941,47 @@
             <!-- Differentiators -->
             <section class="differentiators">
                 <div class="section-header">
+                    <h2 class="section-title">What Makes Fast Cab Different?</h2>
+                </div>
+                
+                <div class="differentiator-list">
+                    <div class="differentiator">
+                        <div class="differentiator-title">No App Download Required</div>
+                        <p class="differentiator-description">Works directly in WhatsApp - the app everyone already has. No storage space needed, no app updates, instant access.</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Natural Language Booking</div>
+                        <p class="differentiator-description">Just say "ride from Lekki to VI" - no forms to fill, no complex interfaces. Book rides the way you naturally speak.</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Offline-Friendly</div>
+                        <p class="differentiator-description">Works even with poor internet connection. WhatsApp's efficient messaging ensures your booking goes through.</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Built for Lagos Traffic</div>
+                        <p class="differentiator-description">Optimized for Nigerian locations, local payment methods, and Lagos-specific routes. Knows your city.</p>
+                    </div>
+                    
+                    <div class="differentiator">
+                        <div class="differentiator-title">Instant Customer Support</div>
+                        <p class="differentiator-description">Issues? Just reply to the chat. No waiting on hold, no separate support app. Everything in one conversation.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer CTA -->
+            <section class="footer-cta">
+                <h2>Ready to Experience the Future?</h2>
+                <p class="footer-description">Join thousands of Lagosians who are already booking rides through WhatsApp. The fastest way to get around the city is just one message away.</p>
+                
+                <button class="primary-cta" onclick="startDemo()" id="demo-button-2">
+                    Start Your Demo Journey
+                </button>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
