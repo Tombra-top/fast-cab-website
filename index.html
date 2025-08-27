@@ -141,6 +141,16 @@
             text-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);
         }
         
+        .logo::before {
+            content: '🚕';
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            -webkit-text-fill-color: #f39c12;
+            filter: drop-shadow(0 2px 8px rgba(243, 156, 18, 0.4));
+            margin-right: 0.5rem;
+        }
+        
         .demo-badge {
             background: var(--accent-gradient);
             color: white;
@@ -684,14 +694,14 @@
             <!-- Hero Section -->
             <section class="hero" role="banner">
                 <div class="brand">
-                    <h1 class="logo">🚖 Fast Cab</h1>
-                    <div class="demo-badge" aria-label="Live Demo Available">🎭 LIVE DEMO</div>
+                    <h1 class="logo">Fast Cab</h1>
+                    <div class="demo-badge" aria-label="Live Demo Available">LIVE DEMO</div>
                 </div>
                 <p class="hero-title">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</p>
                 
                 <div class="cta-section">
                     <button class="primary-cta" onclick="startDemo()" id="demo-button" aria-describedby="setup-instructions">
-                        📱 Try Live Demo Now
+                        Try Live Demo Now
                     </button>
                     
                     <div class="setup-guide" id="setup-instructions">
