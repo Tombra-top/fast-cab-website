@@ -16,8 +16,10 @@
             --text-secondary: #6c757d;
             --shadow-soft: 0 10px 40px rgba(0, 0, 0, 0.08);
             --shadow-medium: 0 20px 60px rgba(0, 0, 0, 0.12);
-            --border-radius: 16px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --shadow-strong: 0 30px 80px rgba(0, 0, 0, 0.16);
+            --border-radius: 20px;
+            --border-radius-small: 12px;
+            --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             --section-padding: clamp(3rem, 8vw, 6rem);
             --content-max-width: 1200px;
         }
@@ -34,12 +36,34 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', Roboto, sans-serif;
-            line-height: 1.6;
+            line-height: 1.7;
             color: var(--text-primary);
             background: var(--primary-gradient);
             background-attachment: fixed;
             min-height: 100vh;
             overflow-x: hidden;
+        }
+        
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 107, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(37, 211, 102, 0.2) 0%, transparent 50%);
+            animation: float 6s ease-in-out infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
         }
         
         /* Skip Link for Accessibility */
@@ -69,12 +93,12 @@
         /* Hero Section */
         .hero {
             background: var(--glass-bg);
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(25px);
             border: 1px solid var(--glass-border);
             border-radius: var(--border-radius);
             padding: var(--section-padding) clamp(1.5rem, 5vw, 3rem);
             margin: 2rem 0;
-            box-shadow: var(--shadow-medium);
+            box-shadow: var(--shadow-strong);
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -88,7 +112,7 @@
             width: 100%;
             height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-            animation: shimmer 3s infinite;
+            animation: shimmer 4s infinite;
             pointer-events: none;
         }
         
@@ -101,80 +125,95 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
         }
         
         .logo {
-            font-size: clamp(2rem, 6vw, 3rem);
+            font-size: clamp(2.5rem, 7vw, 4rem);
             font-weight: 900;
             background: var(--secondary-gradient);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: -0.02em;
+            text-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);
+        }
+        
+        .logo::before {
+            content: '🚕';
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            -webkit-text-fill-color: #f39c12;
+            filter: drop-shadow(0 2px 8px rgba(243, 156, 18, 0.4));
+            margin-right: 0.5rem;
         }
         
         .demo-badge {
             background: var(--accent-gradient);
             color: white;
-            padding: 0.5rem 1.2rem;
+            padding: 0.75rem 1.5rem;
             border-radius: 50px;
             font-size: 0.875rem;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.1em;
             animation: pulse 2s ease-in-out infinite;
-            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
         @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.9; }
+            0%, 100% { transform: scale(1); box-shadow: 0 8px 25px rgba(255, 107, 107, 0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 12px 35px rgba(255, 107, 107, 0.7); }
         }
         
         .hero-title {
-            font-size: clamp(1.25rem, 4vw, 1.5rem);
+            font-size: clamp(1.5rem, 5vw, 2rem);
             color: var(--text-secondary);
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
             font-weight: 400;
-            max-width: 600px;
+            max-width: 700px;
             margin-left: auto;
             margin-right: auto;
+            line-height: 1.4;
         }
         
         /* CTA Section */
         .cta-section {
-            margin: 2rem 0;
+            margin: 3rem 0;
         }
         
         .primary-cta {
             background: var(--secondary-gradient);
             color: white;
             border: none;
-            padding: 1rem 2.5rem;
+            padding: 1.25rem 3rem;
             border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            font-size: 1.2rem;
+            font-weight: 700;
             cursor: pointer;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
+            gap: 0.75rem;
+            margin-bottom: 3rem;
             transition: var(--transition);
-            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.3);
+            box-shadow: 0 12px 40px rgba(37, 211, 102, 0.4);
             position: relative;
             overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.2);
         }
         
         .primary-cta:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(37, 211, 102, 0.4);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 60px rgba(37, 211, 102, 0.5);
         }
         
         .primary-cta:active {
-            transform: translateY(0);
+            transform: translateY(-2px);
         }
         
         .primary-cta.loading {
@@ -201,94 +240,108 @@
         .setup-guide {
             background: linear-gradient(135deg, #25D366, #128C7E);
             color: white;
-            padding: 2rem;
+            padding: 2.5rem;
             border-radius: var(--border-radius);
-            margin: 2rem 0;
-            box-shadow: var(--shadow-soft);
+            margin: 3rem 0;
+            box-shadow: var(--shadow-medium);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .setup-guide h3 {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            font-weight: 700;
         }
         
         .setup-steps {
             display: grid;
-            gap: 1rem;
-            margin: 1rem 0;
+            gap: 1.5rem;
+            margin: 2rem 0;
         }
         
         .setup-step {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            padding: 0.75rem 0;
+            gap: 1.5rem;
+            padding: 1rem 0;
         }
         
         .step-number {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.25);
             color: white;
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             flex-shrink: 0;
+            font-size: 1.1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
         
         .sandbox-code {
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.4);
             color: #00ff88;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
+            padding: 1rem 2rem;
+            border-radius: var(--border-radius-small);
             font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
             font-weight: 600;
             cursor: pointer;
             transition: var(--transition);
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             user-select: all;
+            font-size: 1rem;
         }
         
         .sandbox-code:hover {
-            background: rgba(0, 0, 0, 0.5);
-            transform: scale(1.02);
-            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(0, 0, 0, 0.6);
+            transform: scale(1.05);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .setup-footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
         }
         
         /* Features Grid */
         .features-section {
-            margin: 4rem 0;
+            margin: 6rem 0;
         }
         
         .section-header {
             text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 4rem;
         }
         
         .section-title {
-            font-size: clamp(1.75rem, 5vw, 2.5rem);
-            font-weight: 700;
-            margin-bottom: 1rem;
+            font-size: clamp(2rem, 6vw, 3rem);
+            font-weight: 800;
+            margin-bottom: 1.5rem;
             color: white;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            letter-spacing: -0.02em;
         }
         
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
         }
         
         .feature-card {
             background: var(--glass-bg);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border);
-            padding: 2rem;
+            padding: 2.5rem;
             border-radius: var(--border-radius);
             text-align: center;
             transition: var(--transition);
@@ -297,82 +350,103 @@
             overflow: hidden;
         }
         
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--secondary-gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+        
         .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-medium);
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-strong);
+        }
+        
+        .feature-card:hover::before {
+            transform: scaleX(1);
         }
         
         .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
             display: block;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
         }
         
         .feature-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
             color: var(--text-primary);
         }
         
         .feature-description {
             color: var(--text-secondary);
-            line-height: 1.5;
+            line-height: 1.6;
+            font-size: 1.05rem;
         }
         
         /* Demo Flow */
         .demo-flow {
             background: var(--glass-bg);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border);
             border-radius: var(--border-radius);
-            padding: 3rem 2rem;
-            margin: 4rem 0;
-            box-shadow: var(--shadow-soft);
+            padding: 4rem 3rem;
+            margin: 6rem 0;
+            box-shadow: var(--shadow-medium);
         }
         
         .demo-flow h2 {
             text-align: center;
-            margin-bottom: 2rem;
-            font-size: 1.75rem;
-            font-weight: 700;
+            margin-bottom: 3rem;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text-primary);
         }
         
         .flow-steps {
             display: grid;
-            gap: 1.5rem;
-            max-width: 800px;
+            gap: 2rem;
+            max-width: 900px;
             margin: 0 auto;
         }
         
         .flow-step {
             display: flex;
             align-items: flex-start;
-            gap: 1rem;
-            padding: 1.5rem;
-            background: rgba(102, 126, 234, 0.05);
-            border-radius: 12px;
-            border-left: 4px solid #667eea;
+            gap: 1.5rem;
+            padding: 2rem;
+            background: rgba(102, 126, 234, 0.08);
+            border-radius: var(--border-radius-small);
+            border-left: 5px solid #667eea;
             transition: var(--transition);
         }
         
         .flow-step:hover {
-            background: rgba(102, 126, 234, 0.1);
-            transform: translateX(5px);
+            background: rgba(102, 126, 234, 0.15);
+            transform: translateX(8px);
+            box-shadow: var(--shadow-soft);
         }
         
         .flow-number {
             background: #667eea;
             color: white;
-            width: 36px;
-            height: 36px;
+            width: 45px;
+            height: 45px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
             flex-shrink: 0;
-            font-size: 0.9rem;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
         
         .flow-content {
@@ -380,128 +454,151 @@
         }
         
         .flow-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
             color: var(--text-primary);
+            font-size: 1.2rem;
+        }
+        
+        .flow-description {
+            margin-bottom: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
         }
         
         .message-example {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
             display: inline-block;
             font-family: 'SF Mono', monospace;
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             color: #25D366;
-            font-weight: 500;
-            margin: 0.5rem 0;
-            border: 1px solid rgba(37, 211, 102, 0.2);
+            font-weight: 600;
+            margin: 0.75rem 0;
+            border: 2px solid rgba(37, 211, 102, 0.3);
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2);
         }
         
         .flow-note {
-            font-size: 0.875rem;
+            font-size: 0.95rem;
             color: var(--text-secondary);
-            margin-top: 0.5rem;
+            margin-top: 0.75rem;
             font-style: italic;
+            opacity: 0.8;
         }
         
         /* Sample Messages */
         .samples-section {
-            background: rgba(37, 211, 102, 0.1);
+            background: rgba(37, 211, 102, 0.12);
             border-radius: var(--border-radius);
-            padding: 2rem;
-            margin: 2rem 0;
-            border: 1px solid rgba(37, 211, 102, 0.2);
+            padding: 3rem;
+            margin: 3rem 0;
+            border: 2px solid rgba(37, 211, 102, 0.3);
         }
         
         .samples-section h3 {
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
             color: var(--text-primary);
+            font-size: 1.4rem;
+            font-weight: 700;
         }
         
         .sample-messages {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.75rem;
+            gap: 1rem;
         }
         
         /* Differentiators */
         .differentiators {
             background: var(--glass-bg);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border);
             border-radius: var(--border-radius);
-            padding: 3rem 2rem;
-            margin: 4rem 0;
-            box-shadow: var(--shadow-soft);
+            padding: 4rem 3rem;
+            margin: 6rem 0;
+            box-shadow: var(--shadow-medium);
         }
         
         .differentiator-list {
             display: grid;
-            gap: 1.5rem;
-            max-width: 800px;
-            margin: 2rem auto 0;
+            gap: 2rem;
+            max-width: 900px;
+            margin: 3rem auto 0;
         }
         
         .differentiator {
-            padding: 1.5rem;
-            background: rgba(102, 126, 234, 0.05);
-            border-radius: 12px;
-            border-left: 4px solid #667eea;
+            padding: 2rem;
+            background: rgba(102, 126, 234, 0.08);
+            border-radius: var(--border-radius-small);
+            border-left: 5px solid #667eea;
             transition: var(--transition);
         }
         
         .differentiator:hover {
-            background: rgba(102, 126, 234, 0.1);
-            transform: translateX(5px);
+            background: rgba(102, 126, 234, 0.15);
+            transform: translateX(8px);
+            box-shadow: var(--shadow-soft);
         }
         
         .differentiator-title {
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.2rem;
+        }
+        
+        .differentiator-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 1.05rem;
         }
         
         /* Footer CTA */
         .footer-cta {
             background: var(--glass-bg);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border);
             border-radius: var(--border-radius);
-            padding: 3rem 2rem;
-            margin: 4rem 0 2rem;
+            padding: 4rem 3rem;
+            margin: 6rem 0 3rem;
             text-align: center;
-            box-shadow: var(--shadow-soft);
+            box-shadow: var(--shadow-medium);
         }
         
         .footer-cta h2 {
-            margin-bottom: 1rem;
-            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text-primary);
         }
         
         .footer-description {
             color: var(--text-secondary);
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
             font-style: italic;
-            max-width: 600px;
+            max-width: 650px;
             margin-left: auto;
             margin-right: auto;
+            font-size: 1.1rem;
+            line-height: 1.6;
         }
         
         /* Notification */
         .notification {
             position: fixed;
-            top: 20px;
-            right: 20px;
+            top: 25px;
+            right: 25px;
             background: #25D366;
             color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            box-shadow: var(--shadow-medium);
-            transform: translateX(350px);
+            padding: 1.25rem 2rem;
+            border-radius: var(--border-radius-small);
+            box-shadow: var(--shadow-strong);
+            transform: translateX(400px);
             transition: var(--transition);
             z-index: 1000;
-            font-weight: 500;
+            font-weight: 600;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
@@ -513,12 +610,18 @@
         @media (max-width: 768px) {
             .hero {
                 margin: 1rem 0;
-                padding: 2rem 1.5rem;
+                padding: 3rem 2rem;
+            }
+            
+            .brand {
+                flex-direction: column;
+                gap: 1.5rem;
             }
             
             .primary-cta {
                 width: 100%;
                 justify-content: center;
+                padding: 1.25rem 2rem;
             }
             
             .features-grid {
@@ -528,10 +631,11 @@
             .flow-step {
                 flex-direction: column;
                 text-align: center;
+                padding: 1.5rem;
             }
             
             .flow-number {
-                margin-bottom: 0.5rem;
+                margin-bottom: 1rem;
             }
             
             .sample-messages {
@@ -541,15 +645,19 @@
             .notification {
                 right: 1rem;
                 left: 1rem;
-                transform: translateY(-100px);
+                transform: translateY(-120px);
             }
             
             .notification.show {
                 transform: translateY(0);
             }
             
-            .differentiator {
-                padding: 1rem;
+            .differentiator,
+            .setup-guide,
+            .demo-flow,
+            .differentiators,
+            .footer-cta {
+                padding: 2rem;
             }
         }
         
@@ -565,7 +673,7 @@
         button:focus-visible,
         .sandbox-code:focus-visible {
             outline: 3px solid #667eea;
-            outline-offset: 2px;
+            outline-offset: 3px;
         }
         
         /* High Contrast Mode Support */
@@ -586,14 +694,14 @@
             <!-- Hero Section -->
             <section class="hero" role="banner">
                 <div class="brand">
-                    <h1 class="logo">🚖 Fast Cab</h1>
-                    <div class="demo-badge" aria-label="Live Demo Available">🎭 LIVE DEMO</div>
+                    <h1 class="logo">Fast Cab</h1>
+                    <div class="demo-badge" aria-label="Live Demo Available">LIVE DEMO</div>
                 </div>
                 <p class="hero-title">Lagos' Next-Generation WhatsApp Ride-Hailing Platform</p>
                 
                 <div class="cta-section">
                     <button class="primary-cta" onclick="startDemo()" id="demo-button" aria-describedby="setup-instructions">
-                        📱 Try Live Demo Now
+                        Try Live Demo Now
                     </button>
                     
                     <div class="setup-guide" id="setup-instructions">
@@ -622,7 +730,9 @@
                                 <span>Say "Hi" to start booking rides</span>
                             </div>
                         </div>
-                        <p><strong>✨ Demo runs automatically in 30 seconds!</strong></p>
+                        <div class="setup-footer">
+                            <strong>✨ Demo runs automatically in 30 seconds!</strong>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -664,8 +774,8 @@
                     <div class="flow-step">
                         <div class="flow-number" aria-hidden="true">1</div>
                         <div class="flow-content">
-                            <div class="flow-title">Quick Setup:</div>
-                            <p>Join sandbox (first time only)</p>
+                            <div class="flow-title">Quick Setup</div>
+                            <p class="flow-description">Join sandbox (first time only)</p>
                             <div class="message-example">join cap-pleasure</div>
                         </div>
                     </div>
@@ -673,8 +783,8 @@
                     <div class="flow-step">
                         <div class="flow-number" aria-hidden="true">2</div>
                         <div class="flow-content">
-                            <div class="flow-title">Start Demo:</div>
-                            <p>Say hi to activate</p>
+                            <div class="flow-title">Start Demo</div>
+                            <p class="flow-description">Say hi to activate</p>
                             <div class="message-example">Hi</div>
                         </div>
                     </div>
@@ -682,8 +792,8 @@
                     <div class="flow-step">
                         <div class="flow-number" aria-hidden="true">3</div>
                         <div class="flow-content">
-                            <div class="flow-title">Book Ride:</div>
-                            <p>One message booking</p>
+                            <div class="flow-title">Book Ride</div>
+                            <p class="flow-description">One message booking</p>
                             <div class="message-example">ride from Ikoyi to Victoria Island</div>
                         </div>
                     </div>
@@ -691,8 +801,8 @@
                     <div class="flow-step">
                         <div class="flow-number" aria-hidden="true">4</div>
                         <div class="flow-content">
-                            <div class="flow-title">Choose Type:</div>
-                            <p>Select Economy, Comfort, or Premium</p>
+                            <div class="flow-title">Choose Type</div>
+                            <p class="flow-description">Select Economy, Comfort, or Premium</p>
                             <div class="message-example">1 (for Economy)</div>
                         </div>
                     </div>
@@ -700,8 +810,8 @@
                     <div class="flow-step">
                         <div class="flow-number" aria-hidden="true">5</div>
                         <div class="flow-content">
-                            <div class="flow-title">Auto Demo:</div>
-                            <p>Watch driver assignment → arrival → trip completion</p>
+                            <div class="flow-title">Auto Demo</div>
+                            <p class="flow-description">Watch driver assignment → arrival → trip completion</p>
                             <div class="flow-note">✨ Fully automated - no input needed!</div>
                         </div>
                     </div>
@@ -727,174 +837,10 @@
                 
                 <div class="differentiator-list">
                     <div class="differentiator">
-                        <div class="differentiator-title">No App Download:</div>
-                        <p>Works directly in WhatsApp - the app Lagosians already use daily</p>
+                        <div class="differentiator-title">No App Download</div>
+                        <p class="differentiator-description">Works directly in WhatsApp - the app Lagosians already use daily</p>
                     </div>
                     
                     <div class="differentiator">
-                        <div class="differentiator-title">Natural Language:</div>
-                        <p>Just say where you want to go, no complex forms</p>
-                    </div>
-                    
-                    <div class="differentiator">
-                        <div class="differentiator-title">Lightning Fast:</div>
-                        <p>From "Hi" to booked ride in 3 messages</p>
-                    </div>
-                    
-                    <div class="differentiator">
-                        <div class="differentiator-title">Lagos-Optimized:</div>
-                        <p>Built specifically for Lagos routes, traffic patterns, and locations</p>
-                    </div>
-                    
-                    <div class="differentiator">
-                        <div class="differentiator-title">Transparent Pricing:</div>
-                        <p>See exact fare upfront, no surge surprises</p>
-                    </div>
-                </div>
-            </section>
-            
-            <!-- Footer CTA -->
-            <section class="footer-cta">
-                <h2>🚀 Built for Lagos</h2>
-                <p class="footer-description">
-                    This is a functional MVP demo. Your feedback helps shape the future of ride-hailing in Lagos!
-                </p>
-                <button class="primary-cta" onclick="startDemo()">
-                    🚀 Start Your Demo Experience
-                </button>
-            </section>
-        </main>
-    </div>
-    
-    <div id="notification" class="notification" role="alert" aria-live="polite">
-        📋 Code copied! Paste in WhatsApp
-    </div>
-    
-    <script>
-        function copySandboxCode() {
-            const code = "join cap-pleasure";
-            navigator.clipboard.writeText(code).then(() => {
-                showNotification('📋 Code copied! Paste in WhatsApp');
-            }).catch(() => {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = code;
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-999999px';
-                textArea.style.top = '-999999px';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                showNotification('📋 Code copied! Paste in WhatsApp');
-            });
-        }
-        
-        // Make sandbox code accessible via keyboard
-        document.getElementById('sandbox-code').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                copySandboxCode();
-            }
-        });
-        
-        function showNotification(message) {
-            const notification = document.getElementById('notification');
-            notification.textContent = message;
-            notification.classList.add('show');
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 4000);
-        }
-        
-        function startDemo() {
-            const button = document.getElementById('demo-button');
-            const whatsappNumber = "14155238886";
-            const message = "Hi! I want to try the Fast Cab demo";
-            
-            button.classList.add('loading');
-            button.innerHTML = '🔄 Opening WhatsApp...';
-            button.disabled = true;
-            
-            const waUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
-            
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            if (isMobile) {
-                window.location.href = waUrl;
-            } else {
-                window.open(waUrl, '_blank', 'noopener,noreferrer');
-            }
-            
-            setTimeout(() => {
-                showNotification('📱 WhatsApp opened! Follow setup if first time, then say "Hi"');
-            }, 1000);
-            
-            setTimeout(() => {
-                button.classList.remove('loading');
-                button.innerHTML = '📱 Try Live Demo Now';
-                button.disabled = false;
-            }, 5000);
-        }
-        
-        // Enhanced button interactions
-        document.addEventListener('DOMContentLoaded', function() {
-            const buttons = document.querySelectorAll('.primary-cta');
-            
-            buttons.forEach(button => {
-                const originalText = button.innerHTML;
-                
-                button.addEventListener('mouseleave', function() {
-                    if (!this.classList.contains('loading')) {
-                        this.innerHTML = originalText;
-                    }
-                });
-            });
-        });
-        
-        // Smooth scroll for any internal links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-        
-        // Enhanced accessibility for screen readers
-        function announceToScreenReader(message) {
-            const announcement = document.createElement('div');
-            announcement.setAttribute('aria-live', 'polite');
-            announcement.setAttribute('aria-atomic', 'true');
-            announcement.style.position = 'absolute';
-            announcement.style.left = '-10000px';
-            announcement.style.width = '1px';
-            announcement.style.height = '1px';
-            announcement.style.overflow = 'hidden';
-            announcement.textContent = message;
-            document.body.appendChild(announcement);
-            
-            setTimeout(() => {
-                document.body.removeChild(announcement);
-            }, 1000);
-        }
-        
-        // Performance optimization: Reduce animations on slower devices
-        if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) {
-            document.documentElement.style.setProperty('--transition', 'all 0.2s ease');
-        }
-    </script>
-</body>
-</html>mouseenter', function() {
-                    if (!this.classList.contains('loading')) {
-                        this.innerHTML = '🚀 Start Demo Experience';
-                    }
-                });
-                
-                button.addEventListener('
+                        <div class="differentiator-title">Natural Language</div>
+                        <p class="differentiator-description">Just say where you want to go, no complex forms
